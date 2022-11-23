@@ -3,6 +3,8 @@ from flask_cors import CORS
 import numpy as np
 import cv2
 import db_connector
+import ssl
+
 
 app = Flask(__name__, template_folder='web')
 CORS(app, support_credentials=True)
@@ -92,5 +94,14 @@ def get_model():
     return jsonify({'result': 'ok', 'value': result})
 
 
+@app.route('/log', methods=['GET', 'POST'])
+def log():
+    param_dict = request.args.to_dict()
+    print(param_dict['test'])
+    return jsonify({'result': 'ok'})
+
+
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8080)
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+    ssl_context.load_cert_chain(certfile='server.crt', keyfile='server.key', password='1234')
+    app.run(host='0.0.0.0', port=443, ssl_context=ssl_context, debug=True)
