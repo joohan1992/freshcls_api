@@ -4,6 +4,8 @@ import numpy as np
 import cv2
 import db_connector
 
+import ssl
+
 app = Flask(__name__, template_folder='web')
 CORS(app, support_credentials=True)
 
