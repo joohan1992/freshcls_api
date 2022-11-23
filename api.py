@@ -66,6 +66,37 @@ def get_model():
     # 결과 반환
     return jsonify({'result': 'ok', 'value': result})
 
+@app.route('/auth', methods=('GET', 'POST'))
+def login():
+    
+    param_dict = request.args.to_dict()
+
+    query = "SELECT * FROM auth WHERE 1=1 "
+
+    cond = ''
+    if 'act_yn' in param_dict:
+        cond = f"AND act_yn = '{param_dict['act_yn']}'"
+    query += cond
+
+    if 'auth_cd' in param_dict:
+        cond = f"AND auth_cd = '{param_dict['auth_cd']}'"
+    query += cond
+
+    dbConn = db_connector.DbConn()
+
+    auth_data = dbConn.select(query=query)
+
+    auth_lst = []
+
+    for data in auth_data:
+        auth_dict = dict(zip(['auth_cd', 'act_yn', 'auth_no'],data))
+        auth_lst.append(auth_dict)
+    
+    if auth_lst
+
+    return jsonify({'result': auth_lst, 'authorization_result' : auth_result})
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080)
+
+
