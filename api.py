@@ -120,12 +120,12 @@ def login():
         auth_lst.append(auth_dict)
 
         for dicta in auth_lst:
-        if dicta['auth_cd'] == param_dict['auth_cd']:
-            dicta['act_yn'] = 'Y'
-            dicta['auth_result'] = 'ok'
-        else:
-            dicta['auth_yn'] = 'N'
-            dicta['auth_result'] = 'fail'
+            if dicta['auth_cd'] == param_dict['auth_cd']:
+                dicta['act_yn'] = 'Y'
+                dicta['auth_result'] = 'ok'
+            else:
+                dicta['auth_yn'] = 'N'
+                dicta['auth_result'] = 'fail'
     
     if len(auth_lst) > 0:
         auth_result = 'ok'
