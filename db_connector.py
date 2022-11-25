@@ -58,6 +58,6 @@ class DbConn:
                     row_dict[col.name] = row[i]
                 results.append(row_dict)
         except Exception as e:
-            result = (" select DB err", e)
+            results = []
 
         return results
