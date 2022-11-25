@@ -4,13 +4,8 @@ import psycopg2.extras
 
 class DbConn:
     def __init__(self):
-<<<<<<< HEAD
         self.db = psycopg2.connect(host='10.28.100.11', dbname='freshcls', user='postgres', password='ri1234!@', port=5432)
-        self.cursor = self.db.cursor()
-=======
-        self.db = psycopg2.connect(host='10.28.78.30', dbname='freshcls', user='postgres', password='ri1234!@', port=5432)
         self.cursor = self.db.cursor(cursor_factory=psycopg2.extras.DictCursor)
->>>>>>> 85a9f73a74c0abae1a4098848d63c2085e7cbd1c
 
     def __del__(self):
         self.db.close()

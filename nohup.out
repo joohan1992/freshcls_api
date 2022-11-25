@@ -1,0 +1,18 @@
+/home/gpuadmin/projects/freshcls_api/api.py:164: DeprecationWarning: ssl.PROTOCOL_TLS is deprecated
+  ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+ * Serving Flask app 'api' (lazy loading)
+ * Environment: production
+   WARNING: This is a development server. Do not use it in a production deployment.
+   Use a production WSGI server instead.
+ * Debug mode: on
+Address already in use
+Port 5443 is in use by another program. Either identify and stop that program, or start the server with a different port.
+/home/gpuadmin/projects/freshcls_api/api.py:164: DeprecationWarning: ssl.PROTOCOL_TLS is deprecated
+  ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+ * Serving Flask app 'api' (lazy loading)
+ * Environment: production
+   WARNING: This is a development server. Do not use it in a production deployment.
+   Use a production WSGI server instead.
+ * Debug mode: on
+Address already in use
+Port 5443 is in use by another program. Either identify and stop that program, or start the server with a different port.
