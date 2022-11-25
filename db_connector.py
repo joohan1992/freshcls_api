@@ -3,7 +3,7 @@ import psycopg2
 
 class DbConn:
     def __init__(self):
-        self.db = psycopg2.connect(host='10.28.78.30', dbname='freshcls', user='postgres', password='ri1234!@', port=5432)
+        self.db = psycopg2.connect(host='10.28.100.11', dbname='freshcls', user='postgres', password='ri1234!@', port=5432)
         self.cursor = self.db.cursor()
 
     def __del__(self):
