@@ -16,3 +16,39 @@ Port 5443 is in use by another program. Either identify and stop that program, o
  * Debug mode: on
 Address already in use
 Port 5443 is in use by another program. Either identify and stop that program, or start the server with a different port.
+/home/gpuadmin/projects/freshcls_api/api.py:164: DeprecationWarning: ssl.PROTOCOL_TLS is deprecated
+  ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+ * Serving Flask app 'api' (lazy loading)
+ * Environment: production
+   WARNING: This is a development server. Do not use it in a production deployment.
+   Use a production WSGI server instead.
+ * Debug mode: on
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on https://127.0.0.1:5443
+ * Running on https://10.28.100.11:5443
+Press CTRL+C to quit
+ * Restarting with stat
+/home/gpuadmin/projects/freshcls_api/api.py:164: DeprecationWarning: ssl.PROTOCOL_TLS is deprecated
+  ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+ * Debugger is active!
+ * Debugger PIN: 506-696-055
+10.28.100.11 - - [25/Nov/2022 14:25:47] "GET /web/ HTTP/1.1" 200 -
+10.28.100.11 - - [25/Nov/2022 14:25:47] "GET /web/flutter.js HTTP/1.1" 200 -
+10.28.100.11 - - [25/Nov/2022 14:25:47] "GET /web/favicon.png HTTP/1.1" 200 -
+10.28.100.11 - - [25/Nov/2022 14:25:47] "GET /web/favicon.png HTTP/1.1" 200 -
+10.28.100.11 - - [25/Nov/2022 14:25:47] "GET /web/flutter_service_worker.js?v=71903751 HTTP/1.1" 200 -
+10.28.100.11 - - [25/Nov/2022 14:25:47] "GET /web/main.dart.js HTTP/1.1" 200 -
+10.28.100.11 - - [25/Nov/2022 14:25:48] "GET /web/assets/FontManifest.json HTTP/1.1" 200 -
+10.28.100.11 - - [25/Nov/2022 14:25:48] "GET /web/assets/fonts/MaterialIcons-Regular.otf HTTP/1.1" 200 -
+10.28.100.11 - - [25/Nov/2022 14:25:48] "GET /web/assets/packages/cupertino_icons/assets/CupertinoIcons.ttf HTTP/1.1" 200 -
+10.28.100.11 - - [25/Nov/2022 14:25:50] "GET /web/favicon.png HTTP/1.1" 200 -
+10.28.100.11 - - [25/Nov/2022 14:29:33] "GET /web/ HTTP/1.1" 200 -
+10.28.100.11 - - [25/Nov/2022 14:29:33] "GET /web/flutter.js HTTP/1.1" 200 -
+10.28.100.11 - - [25/Nov/2022 14:29:33] "GET /web/manifest.json HTTP/1.1" 200 -
+10.28.100.11 - - [25/Nov/2022 14:29:33] "GET /web/icons/Icon-maskable-192.png HTTP/1.1" 200 -
+10.28.100.11 - - [25/Nov/2022 14:29:33] "GET /web/main.dart.js HTTP/1.1" 200 -
+10.28.100.11 - - [25/Nov/2022 14:29:34] "GET /web/icons/Icon-192.png HTTP/1.1" 200 -
+10.28.100.11 - - [25/Nov/2022 14:29:34] "GET /web/assets/FontManifest.json HTTP/1.1" 200 -
+10.28.100.11 - - [25/Nov/2022 14:29:35] "GET /web/assets/fonts/MaterialIcons-Regular.otf HTTP/1.1" 200 -
+10.28.100.11 - - [25/Nov/2022 14:29:35] "GET /web/assets/packages/cupertino_icons/assets/CupertinoIcons.ttf HTTP/1.1" 200 -
