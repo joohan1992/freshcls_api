@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, render_template, send_from_directory, json
 from flask_cors import CORS
 import numpy as np
 import cv2
@@ -142,8 +142,21 @@ def log():
     return jsonify({'result': 'ok'})
 
 
-@app.route('/test', methods=['GET', 'POST'])
+@app.route('/test', methods=['POST'])
 def test():
+    param_dict = request.form.get('val1')
+    print(param_dict)
+
+    # 기본 모델 조회 쿼리(조건 언제나 TRUE)
+    query = "SELECT * FROM model WHERE 1=1 "
+
+    # DB 객체 생성
+    dbConn = db_connector.DbConn()
+    # 쿼리 실행
+    result = dbConn.selectAsDict(query)
+
+    print(result)
+
     return jsonify({'result': 'ok'})
 
 
