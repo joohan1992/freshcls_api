@@ -134,10 +134,16 @@ def login():
 
     return jsonify({'result': auth_lst, 'authorization_result' : auth_result})
 
+
 @app.route('/log', methods=['GET', 'POST'])
 def log():
     param_dict = request.args.to_dict()
     print(param_dict['test'])
+    return jsonify({'result': 'ok'})
+
+
+@app.route('/test', methods=['GET', 'POST'])
+def test():
     return jsonify({'result': 'ok'})
 
 
