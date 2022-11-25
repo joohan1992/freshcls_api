@@ -52,3 +52,9 @@ Press CTRL+C to quit
 10.28.100.11 - - [25/Nov/2022 14:29:34] "GET /web/assets/FontManifest.json HTTP/1.1" 200 -
 10.28.100.11 - - [25/Nov/2022 14:29:35] "GET /web/assets/fonts/MaterialIcons-Regular.otf HTTP/1.1" 200 -
 10.28.100.11 - - [25/Nov/2022 14:29:35] "GET /web/assets/packages/cupertino_icons/assets/CupertinoIcons.ttf HTTP/1.1" 200 -
+ * Detected change in '/home/gpuadmin/projects/freshcls_api/test_client.py', reloading
+ * Restarting with stat
+/home/gpuadmin/projects/freshcls_api/api.py:166: DeprecationWarning: ssl.PROTOCOL_TLS is deprecated
+  ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+ * Debugger is active!
+ * Debugger PIN: 506-696-055
