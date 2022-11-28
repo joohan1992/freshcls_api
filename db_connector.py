@@ -4,6 +4,7 @@ import psycopg2.extras
 
 class DbConn:
     def __init__(self):
+
         self.db = psycopg2.connect(host='127.0.0.1', dbname='testDB', user='postgres', password='ri1234!@', port=5432)
         self.cursor = self.db.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
@@ -20,7 +21,7 @@ class DbConn:
 
     def commit(self):
         self.cursor.commit()
-    
+
     def lastpick(self,id=0):
         return self.cursor.fetchone()[id]
     
@@ -29,7 +30,6 @@ class DbConn:
             text = 'insert'
         try:
             self.cursor.execute(query)
-            
             self.db.commit()
         except Exception as e:
             print(f" {text} DB  ", e)
