@@ -227,6 +227,7 @@ def infer_feedback():
     
     res= request.get_json()
     #'feedback'이랑 inferno 받아야함.
+    # inferno가 영어로 들어올텐데 숫자로 바꿔서 기록해야함
     dbConn = db_connector.DbConn()
     query = f"UPDATE infer_history SET feedback = {res['feedback']} WHERE infer_no = {res['infer_no']}"
     dbConn.insert(query=query)    
