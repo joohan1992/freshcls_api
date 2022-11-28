@@ -224,16 +224,27 @@ def run():
 
 @app.route('/infer_feedback', methods=['POST'])
 def infer_feedback():
-    
-    res= request.get_json()
-    #'feedback'이랑 inferno 받아야함.
-    # inferno가 영어로 들어올텐데 숫자로 바꿔서 기록해야함
+    query = "SELECT * FROM auth"
     dbConn = db_connector.DbConn()
-    query = f"UPDATE infer_history SET feedback = {res['feedback']} WHERE infer_no = {res['infer_no']}"
-    dbConn.insert(query=query)    
-    
-    return jsonify({'result': 'ok thanksyou for feedback' })
+    auth_dict_list=dbConn.select(query=query) 
 
+    res = request.get_json()
+    auth_key=res['key']
+    isauth=False
+    for i in auth_dict_list:
+        if i['auth_cd']==auth_key and i['act_yn'] =="Y":
+            isauth=True
+            break
+    if isauth:
+        feedback=res['feedback']
+        infer_no=res['infer_no']
+        feeback_labelnum=int(label_rev[feedback])
+        dbConn = db_connector.DbConn()
+        query = f"UPDATE infer_history SET feedback = {feeback_labelnum} WHERE infer_no = {infer_no}"
+        dbConn.insert(query=query)    
+        return jsonify({'result': 'ok thanksyou for feedback' })
+    else:
+        return jsonify({'result': 'key is unvalid' })
 
 @app.route('/get_model', methods=['GET', 'POST'])
 def get_model():
