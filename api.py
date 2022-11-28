@@ -42,19 +42,18 @@ model2 = load_model('./model/'+modelname2)
 model3 = load_model('./model/'+modelname3)
 model4 = load_model('./model/'+modelname4)
 undeflist=["background"]
-label= {'0': 'pear', '1': 'tomato', '2': 'cone', '3': 'sweetpotato', '4': 'sangchu', 
-       '5': 'pineapple', '6': 'avocado', '7': 'paprika(green)', '8': 'eggplant', '9': 'sora',
-       '10': 'ssukgod', '11': 'sesame', '12': 'cucumber', '13': 'paprika(yellow)',
-       '14': 'pepper', '15': 'beannamul', '16': 'chungkyoungchae', '17': 'cabbage', 
-       '18': 'background', '19': 'spinach', '20': 'babypumpkin', '21': 'orange', 
-       '22': 'persimmon', '23': 'gganonion', '24': 'garlic', '25': 'carrot', 
-       '26': 'garibi', '27': 'kiwi', '28': 'paprika(red)', '29': 'potato',
-       '30': 'watermelon', '31': 'apple', '32': 'abalone', '33': 'radish', 
-       '34': 'chicory', '35': 'gosu', '36': 'peach', '37': 'grape', '38': 'green onion',
-       '39': 'angganonion', '40': 'trueoutside', '41': 'shinemuscat', '42': 'lemon',
-       '43': 'strawberry', '44': 'koreancabbage', '45': 'daechu', '46': 'gosari', 
-       '47': 'broccoli', '48': 'pumpkin', '49': 'banana', '50': 'mushroom'}
-label_rev= {v:k for k,v in label.items()}
+
+## 현재는 이렇게 받아오는데 나중에는 요청 들어올때마다 받아와야하나? 아님 미리 메모리에 올려야되나?
+query = "SELECT * FROM str_label"
+dbConn = db_connector.DbConn()
+dbConn.select(query=query)  
+items_label=dbConn.select(query=query)
+label={}
+label_rev={}
+for i in items_label:
+    if i[0]==0:
+        label[str(i[1])]=i[2]
+        label_rev[i[2]]=str(i[1]
 
 ##########################################################################################
 ##########################################################################################
@@ -79,8 +78,6 @@ def now():
 
 def current_milli_time():
     return round(time.time() * 1000)
-
-
 
 app = Flask(__name__, template_folder='web')
 CORS(app, support_credentials=True)
