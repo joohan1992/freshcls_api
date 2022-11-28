@@ -26,21 +26,24 @@ os.environ["CUDA_VISIBLE_DEVICES"]="1"
 ##########################################################################################
 ############################## 나중에 DB에서 가져와야 될 부분###############################
 ##########################################################################################
-modelnum=4
-modelname1="50tr_incept_1.h5"
-modelname2="50tr_Xception_1.h5"
-modelname3="50tr_IncepRes_1.h5"
-modelname4="50tr_Efficient_1.h5"
+
+query = "SELECT model_no FROM model where model_nm='ensemble'"
+dbConn = db_connector.DbConn()
+model_no=dbConn.select(query=query)
+
+query = f'SELECT * FROM ensemble_model where model_no={model_no[0][0]}'
+ensemble_list=dbConn.select(query=query)
+
+modelnum=len(ensemble_list)
+modellist=[]
+
+for i in ensemble_list:
+    modellist.append(load_model(i[4]))
 
 HUDDLE1=0.8
 HUDDLE2=0.5
 
 UNDEFMSG="Undefined"
-
-model1 = load_model('./model/'+modelname1)
-model2 = load_model('./model/'+modelname2)
-model3 = load_model('./model/'+modelname3)
-model4 = load_model('./model/'+modelname4)
 undeflist=["background"]
 
 ## 현재는 이렇게 받아오는데 나중에는 요청 들어올때마다 받아와야하나? 아님 미리 메모리에 올려야되나?
@@ -149,31 +152,38 @@ def run():
     query += f" VALUES(NOW() ,NOW() , {x_size} , {y_size}, '{save_file_path[1:]}' ) RETURNING image_no"
     dbConn = db_connector.DbConn()
     dbConn.insert(query=query)        
-    
+    img_no=dbConn.lastpick()
     ## 이미지전처리
     data_resize=cv2.resize(data,(299,299))
     predict_img = cv2.cvtColor(data_resize,cv2.COLOR_BGR2RGB)  
     x = image.image_utils.img_to_array(predict_img)
     x = np.expand_dims(x, axis = 0)     ## efficientnet일 경우
     ## preprocessing 없는 모델은 여기서 추론
-    m4=model4.predict(x,verbose = 0)[0]
+    m4=modellist[3].predict(x,verbose = 0)[0]
     ## preprocessing 필요하면 여기서 추론
     x = preprocess_input(x)
-    m1=model1.predict(x,verbose = 0)[0]   
-    m2=model2.predict(x,verbose = 0)[0]   
-    m3=model3.predict(x,verbose = 0)[0]   
-    features=m1+m2+m3+m4
+    m1=modellist[0].predict(x,verbose = 0)[0]   
+    m2=modellist[1].predict(x,verbose = 0)[0]   
+    m3=modellist[2].predict(x,verbose = 0)[0]   
+    features=sum(modellist)
     predicted_list=features
     predicted_class=[]
     predicted_set = { 
-                    label[str(np.argmax(m1))],
-                    label[str(np.argmax(m2))],
-                    label[str(np.argmax(m3))],
-                    label[str(np.argmax(m4))]
-                    }
+                        label[str(np.argmax(m1))],
+                        label[str(np.argmax(m2))],
+                        label[str(np.argmax(m3))],
+                        label[str(np.argmax(m4))]
+                        }
     top2=FindTopN(predicted_list,2)
     predicted_class=list(top2.keys())
     
+
+    # ind_prob=[]
+    # ind_prob.append(FindTopN(m1,2))
+    # ind_prob.append(FindTopN(m2,2))
+    # ind_prob.append(FindTopN(m3,2))
+    # ind_prob.append(FindTopN(m4,2))
+
     cls_list = [] #마지막에 request로 전송할 결과값
     if predicted_class[0] in undeflist: ##1순위가 undef thing일때
         cls_list.append(predicted_class[0])
@@ -202,22 +212,31 @@ def run():
 
     if phase==0: #undefined
         query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
-        query += f" VALUES(NOW() ,{0} , {0} , {dbConn.lastpick()} , {-1}, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
+        query += f" VALUES(NOW() ,{0} , {0} , {img_no} , {-1}, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
         dbConn.insert(query=query)
     elif phase==1: #1 items infer
         query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
-        query += f" VALUES(NOW() ,{0} , {0} , {dbConn.lastpick()} , {int(label_rev[cls_list[0]])}, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
+        query += f" VALUES(NOW() ,{0} , {0} , {img_no} , {int(label_rev[cls_list[0]])}, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
         dbConn.insert(query=query)
     elif phase==2: #2 items infer
         query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
-        query += f" VALUES(NOW() ,{0} , {0} , {dbConn.lastpick()} , {int(label_rev[cls_list[0]])}, {int(label_rev[cls_list[1]])} , {timecheck} ,NOW(), NULL) RETURNING infer_no"
+        query += f" VALUES(NOW() ,{0} , {0} , {img_no} , {int(label_rev[cls_list[0]])}, {int(label_rev[cls_list[1]])} , {timecheck} ,NOW(), NULL) RETURNING infer_no"
         dbConn.insert(query=query)
     else: # error
         query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
-        query += f" VALUES(NOW() ,{0} , {0} , {dbConn.lastpick()} , NULL, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
+        query += f" VALUES(NOW() ,{0} , {0} , {img_no} , NULL, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
         dbConn.insert(query=query)
+
+    infer_no=dbConn.lastpick(id=0)
+
+    # for i in ind_prob:
+    #     m1top2[list(m1top2)[i]]
+    #     query = "INSERT INTO ensemble_infer_history(infer_no, image_no, result1,result2,result1_prob,result2_prob,ensemble_model_no)"
+    #     query += f" VALUES({infer_no},{img_no},{list(m1top2)[i]},{},{},{},{model_no[0][0]}) RETURNING infer_no"
+    #     dbConn.insert(query=query)
+
     
-    return jsonify({'result': 'ok', 'cls_list': cls_list, 'infer_no' :dbConn.lastpick(id=0) }) #feedback을 위해서 infer_no도 반환
+    return jsonify({'result': 'ok', 'cls_list': cls_list, 'infer_no' :infer_no }) #feedback을 위해서 infer_no도 반환
 
 @app.route('/infer_feedback', methods=['POST'])
 def infer_feedback():
