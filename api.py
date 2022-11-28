@@ -12,14 +12,54 @@ from keras.preprocessing import image
 import os
 from datetime import datetime
 
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
+import sys
+import base64
+import time
 
-def iferror(item, err="error"):
-    try:
-        return item
-    except:
-        return err
+
+encoding = sys.getdefaultencoding()
+
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   
+os.environ["CUDA_VISIBLE_DEVICES"]="1" 
+
+
+##########################################################################################
+############################## 나중에 DB에서 가져와야 될 부분###############################
+##########################################################################################
+modelnum=4
+modelname1="50tr_incept_1.h5"
+modelname2="50tr_Xception_1.h5"
+modelname3="50tr_IncepRes_1.h5"
+modelname4="50tr_Efficient_1.h5"
+
+HUDDLE1=0.8
+HUDDLE2=0.5
+
+UNDEFMSG="Undefined"
+
+model1 = load_model('./model/'+modelname1)
+model2 = load_model('./model/'+modelname2)
+model3 = load_model('./model/'+modelname3)
+model4 = load_model('./model/'+modelname4)
+undeflist=["background"]
+label= {'0': 'pear', '1': 'tomato', '2': 'cone', '3': 'sweetpotato', '4': 'sangchu', 
+       '5': 'pineapple', '6': 'avocado', '7': 'paprika(green)', '8': 'eggplant', '9': 'sora',
+       '10': 'ssukgod', '11': 'sesame', '12': 'cucumber', '13': 'paprika(yellow)',
+       '14': 'pepper', '15': 'beannamul', '16': 'chungkyoungchae', '17': 'cabbage', 
+       '18': 'background', '19': 'spinach', '20': 'babypumpkin', '21': 'orange', 
+       '22': 'persimmon', '23': 'gganonion', '24': 'garlic', '25': 'carrot', 
+       '26': 'garibi', '27': 'kiwi', '28': 'paprika(red)', '29': 'potato',
+       '30': 'watermelon', '31': 'apple', '32': 'abalone', '33': 'radish', 
+       '34': 'chicory', '35': 'gosu', '36': 'peach', '37': 'grape', '38': 'green onion',
+       '39': 'angganonion', '40': 'trueoutside', '41': 'shinemuscat', '42': 'lemon',
+       '43': 'strawberry', '44': 'koreancabbage', '45': 'daechu', '46': 'gosari', 
+       '47': 'broccoli', '48': 'pumpkin', '49': 'banana', '50': 'mushroom'}
+label_rev= {v:k for k,v in label.items()}
+
+##########################################################################################
+##########################################################################################
+##########################################################################################
+
     
 def FindTopN(predict, N):
     TopN={}
@@ -36,6 +76,9 @@ def now():
     now = datetime.now()
     string = str(now).replace(":", "-")
     return string[0:10]+"_"+string[11:22]
+
+def current_milli_time():
+    return round(time.time() * 1000)
 
 
 
@@ -65,42 +108,119 @@ def return_flutter_doc(name):
 
 @app.route('/run', methods=['POST'])
 def run():
+    timecheck=current_milli_time()
+    encoded_img=request.json['image']
+    x_size=request.json['x_size']
+    y_size=request.json['y_size']
+    img_channel=request.json['channel']
+    key=request.json['key']
+    auth=request.json['auth'] # code or id
+    userID=request.json['ID']
+    userPW=request.json['PW']
 
     # 파일명
     filename=now()+'.jpg'
     save_file_path = './request_image/'+filename
     while os.path.isfile(save_file_path):
         filename= filename.split(".jpg")[0]+"(1).jpg"
-        save_file_path = './request_img/'+filename
+        save_file_path = './request_image/'+filename
     print(save_file_path)
-    # 다시조립
-    data = request.data
-    data = np.frombuffer(data, dtype='float32').reshape((210, 280, 3))
-    data = np.array(data, dtype='uint8')
+
+    # string to bytes
+    string_to_bytes = encoded_img.encode(encoding)
+    bytes_to_numpy = base64.decodebytes(string_to_bytes)
+    data = np.frombuffer(bytes_to_numpy, dtype='uint8').reshape((y_size, x_size, img_channel))
     cv2.imwrite(save_file_path,data)
     
     query = "INSERT INTO img_data(date,time,resol_x,resol_y,file_path)"
-    query += f" VALUES(NOW() ,NOW() , {280} , {210}, '{save_file_path[1:]}' ) RETURNING image_no"
+    query += f" VALUES(NOW() ,NOW() , {x_size} , {y_size}, '{save_file_path[1:]}' ) RETURNING image_no"
     dbConn = db_connector.DbConn()
     dbConn.insert(query=query)        
     
+
+      
+    ## 이미지전처리
+    data_resize=cv2.resize(data,(299,299))
+    predict_img = cv2.cvtColor(data_resize,cv2.COLOR_BGR2RGB)  
+    x = image.image_utils.img_to_array(predict_img)
+    x = np.expand_dims(x, axis = 0)     ## efficientnet일 경우
+    ## preprocessing 없는 모델은 여기서 추론
+    m4=model4.predict(x,verbose = 0)[0]
+    ## preprocessing 필요하면 여기서 추론
+    x = preprocess_input(x)
+    m1=model1.predict(x,verbose = 0)[0]   
+    m2=model2.predict(x,verbose = 0)[0]   
+    m3=model3.predict(x,verbose = 0)[0]   
+    
+    features=m1+m2+m3+m4
+    predicted_list=features
+    predicted_class=[]
+    predicted_set = { 
+                    label[str(np.argmax(m1))],
+                    label[str(np.argmax(m2))],
+                    label[str(np.argmax(m3))],
+                    label[str(np.argmax(m4))]
+                    }
+    top2=FindTopN(predicted_list,2)
+    predicted_class=list(top2.keys())
+    
+    cls_list = [] #마지막에 request로 전송할 결과값
+    if predicted_class[0] in undeflist: ##1순위가 undef thing일때
+        cls_list.append(predicted_class[0])
+        phase=0
+
+    elif max(predicted_list)>HUDDLE1*modelnum: ##1개만 출력
+        cls_list.append(predicted_class[0])
+        phase=1
+
+    elif len(predicted_set)==modelnum: #undef출력
+        cls_list.append(UNDEFMSG)
+        phase=0
+
+    elif max(max(m1),max(m2),max(m3),max(m4)) < HUDDLE2: #undef출력
+        cls_list.append(UNDEFMSG)
+        phase=0
+
+    elif max(predicted_list)>HUDDLE2*2 :##2개합쳐서 2(*4)넘을때도하자
+        cls_list.append(predicted_class[0]) 
+        if predicted_class[1] in undeflist: # 1개
+            phase=1
+        else:
+            cls_list.append(predicted_class[1]) #2개
+            phase=2
+    else:
+        cls_list.append(UNDEFMSG)  
+        phase=0
+    
+    
             
-    # 일반 Post로 전송했을 경우 데이터를 받는 코드(기존 클라이언트), xsize랑 ysize도 같이 받아야 함.
-    ## 중간코드 추후작성요망
+    timecheck=current_milli_time()-timecheck
     
-    cls_list = ['true']
-    query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, result3, infer_speed, time, feedback)"
-    query += f" VALUES(NOW() ,{0} , {0} , {dbConn.lastpick()} , 1, NULL , NULL, {23} ,NOW(), NULL) RETURNING infer_no"
-    dbConn.insert(query=query)    
+    if cls_list==0:
+        query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
+        query += f" VALUES(NOW() ,{0} , {0} , {dbConn.lastpick()} , {-1}, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
+        dbConn.insert(query=query)
+    elif cls_list==1:
+        query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
+        query += f" VALUES(NOW() ,{0} , {0} , {dbConn.lastpick()} , {int(label_rev[cls_list[0]])}, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
+        dbConn.insert(query=query)
+    elif cls_list==2:
+        query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
+        query += f" VALUES(NOW() ,{0} , {0} , {dbConn.lastpick()} , {int(label_rev[cls_list[0]])}, {int(label_rev[cls_list[1]])} , {timecheck} ,NOW(), NULL) RETURNING infer_no"
+        dbConn.insert(query=query)
+    else:
+        query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
+        query += f" VALUES(NOW() ,{0} , {0} , {dbConn.lastpick()} , NULL, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
+        dbConn.insert(query=query)
     
-    return jsonify({'result': 'ok', 'cls_list': cls_list, 'infer_no':dbConn.lastpick(id=0) })
+    return jsonify({'result': 'ok', 'cls_list': cls_list, 'infer_no' :dbConn.lastpick(id=0) }) #feedback을 위해서 infer_no도 반환
 
 @app.route('/infer_feedback', methods=['POST'])
 def infer_feedback():
     
 
     res= request.get_json()
-    
+    #'feedback'이랑 inferno 받아야함.
     dbConn = db_connector.DbConn()
     query = f"UPDATE infer_history SET feedback = {res['feedback']} WHERE infer_no = {res['infer_no']}"
     dbConn.insert(query=query)    
