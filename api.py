@@ -38,7 +38,7 @@ modelnum=len(ensemble_list)
 modellist=[]
 
 for i in ensemble_list:
-    modellist.append(load_model(i[4]))
+    modellist.append(load_model(i[3]))
 
 HUDDLE1=0.8
 HUDDLE2=0.5
