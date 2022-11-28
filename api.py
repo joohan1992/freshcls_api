@@ -108,17 +108,33 @@ def return_flutter_doc(name):
 
 @app.route('/run', methods=['POST'])
 def run():
+
     timecheck=current_milli_time()
+    
+    #json에서 data 받아오기
     encoded_img=request.json['image']
     x_size=request.json['x_size']
     y_size=request.json['y_size']
     img_channel=request.json['channel']
-    key=request.json['key']
+    auth_key=request.json['key']
     auth=request.json['auth'] # code or id
     userID=request.json['ID']
     userPW=request.json['PW']
 
-    # 파일명
+    query = "SELECT * FROM auth"
+    dbConn = db_connector.DbConn()
+    auth_dict_list=dbConn.select(query=query) 
+    isauth=False
+    if auth=="code":
+        for i in auth_dict_list:
+            if i['auth_cd']==auth_key and i['act_yn'] =="Y":
+                isauth=True
+                break
+    #elif auth=="id"
+    #   id/pw 매칭
+    if isauth==False: ## 인증키 없으면
+        return jsonify({'result': 'not permission', 'cls_list': None, 'infer_no' :None})
+    # 파일명 생성 및 이미지 저장
     filename=now()+'.jpg'
     save_file_path = './request_image/'+filename
     while os.path.isfile(save_file_path):
@@ -137,8 +153,6 @@ def run():
     dbConn = db_connector.DbConn()
     dbConn.insert(query=query)        
     
-
-      
     ## 이미지전처리
     data_resize=cv2.resize(data,(299,299))
     predict_img = cv2.cvtColor(data_resize,cv2.COLOR_BGR2RGB)  
@@ -151,7 +165,6 @@ def run():
     m1=model1.predict(x,verbose = 0)[0]   
     m2=model2.predict(x,verbose = 0)[0]   
     m3=model3.predict(x,verbose = 0)[0]   
-    
     features=m1+m2+m3+m4
     predicted_list=features
     predicted_class=[]
@@ -168,19 +181,15 @@ def run():
     if predicted_class[0] in undeflist: ##1순위가 undef thing일때
         cls_list.append(predicted_class[0])
         phase=0
-
     elif max(predicted_list)>HUDDLE1*modelnum: ##1개만 출력
         cls_list.append(predicted_class[0])
         phase=1
-
     elif len(predicted_set)==modelnum: #undef출력
         cls_list.append(UNDEFMSG)
         phase=0
-
     elif max(max(m1),max(m2),max(m3),max(m4)) < HUDDLE2: #undef출력
         cls_list.append(UNDEFMSG)
         phase=0
-
     elif max(predicted_list)>HUDDLE2*2 :##2개합쳐서 2(*4)넘을때도하자
         cls_list.append(predicted_class[0]) 
         if predicted_class[1] in undeflist: # 1개
@@ -191,24 +200,22 @@ def run():
     else:
         cls_list.append(UNDEFMSG)  
         phase=0
-    
-    
-            
+    ## 영어이름으로줌
     timecheck=current_milli_time()-timecheck
-    
-    if cls_list==0:
+
+    if phase==0: #undefined
         query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
         query += f" VALUES(NOW() ,{0} , {0} , {dbConn.lastpick()} , {-1}, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
         dbConn.insert(query=query)
-    elif cls_list==1:
+    elif phase==1: #1 items infer
         query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
         query += f" VALUES(NOW() ,{0} , {0} , {dbConn.lastpick()} , {int(label_rev[cls_list[0]])}, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
         dbConn.insert(query=query)
-    elif cls_list==2:
+    elif phase==2: #2 items infer
         query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
         query += f" VALUES(NOW() ,{0} , {0} , {dbConn.lastpick()} , {int(label_rev[cls_list[0]])}, {int(label_rev[cls_list[1]])} , {timecheck} ,NOW(), NULL) RETURNING infer_no"
         dbConn.insert(query=query)
-    else:
+    else: # error
         query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
         query += f" VALUES(NOW() ,{0} , {0} , {dbConn.lastpick()} , NULL, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
         dbConn.insert(query=query)
@@ -218,7 +225,6 @@ def run():
 @app.route('/infer_feedback', methods=['POST'])
 def infer_feedback():
     
-
     res= request.get_json()
     #'feedback'이랑 inferno 받아야함.
     dbConn = db_connector.DbConn()
