@@ -19,8 +19,8 @@ import time
 
 encoding = sys.getdefaultencoding()
 
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   
-os.environ["CUDA_VISIBLE_DEVICES"]="1" 
+# os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+# os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 
 ##########################################################################################
@@ -105,6 +105,7 @@ def return_flutter_doc(name):
 
 @app.route('/run', methods=['POST'])
 def run():
+    idx_log = 0
 
     timecheck=current_milli_time()
     
@@ -127,10 +128,12 @@ def run():
             if i['auth_cd']==auth_key and i['act_yn'] =="Y":
                 isauth=True
                 break
+
     #elif auth=="id"
     #   id/pw 매칭
     if isauth==False: ## 인증키 없으면
         return jsonify({'result': 'not permission', 'cls_list': None, 'infer_no' :None})
+
     # 파일명 생성 및 이미지 저장
     filename=now()+'.jpg'
     save_file_path = './request_image/'+filename
@@ -142,17 +145,26 @@ def run():
     # string to bytes
     string_to_bytes = encoded_img.encode(encoding)
     bytes_to_numpy = base64.decodebytes(string_to_bytes)
-    data = np.frombuffer(bytes_to_numpy, dtype='uint8').reshape((y_size, x_size, img_channel))
-    cv2.imwrite(save_file_path,data)
+    # if isinstance(bytes_to_numpy, str):
+    list_bytes = []
+    bytes_to_numpy = bytes_to_numpy.split(b'[')[1].split(b']')[0].split(b', ')
+    for item in bytes_to_numpy:
+        list_bytes.append(int(item))
+    data = np.array(list_bytes, dtype=np.uint8).reshape((int(y_size), int(x_size), -1))[:, :, :3]
+    # else:
+    #   data = np.frombuffer(bytes_to_numpy).reshape((y_size, x_size, img_channel))
+    cv2.imwrite(save_file_path, data)
     
     query = "INSERT INTO img_data(date,time,resol_x,resol_y,file_path)"
     query += f" VALUES(NOW() ,NOW() , {x_size} , {y_size}, '{save_file_path[1:]}' ) RETURNING image_no"
     dbConn = db_connector.DbConn()
-    dbConn.insert(query=query)        
+    dbConn.insert(query=query)
+    print(idx_log)
+    idx_log += 1
     
     ## 이미지전처리
-    data_resize=cv2.resize(data,(299,299))
-    predict_img = cv2.cvtColor(data_resize,cv2.COLOR_BGR2RGB)  
+    data_resize=cv2.resize(data, (299, 299))
+    predict_img = cv2.cvtColor(data_resize,cv2.COLOR_BGR2RGB)
     x = image.image_utils.img_to_array(predict_img)
     x = np.expand_dims(x, axis = 0)     ## efficientnet일 경우
     ## preprocessing 없는 모델은 여기서 추론
@@ -173,6 +185,8 @@ def run():
                     }
     top2=FindTopN(predicted_list,2)
     predicted_class=list(top2.keys())
+    print(idx_log)
+    idx_log += 1
     
     cls_list = [] #마지막에 request로 전송할 결과값
     if predicted_class[0] in undeflist: ##1순위가 undef thing일때
@@ -199,6 +213,8 @@ def run():
         phase=0
     ## 영어이름으로줌
     timecheck=current_milli_time()-timecheck
+    print(idx_log)
+    idx_log += 1
 
     if phase==0: #undefined
         query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
@@ -216,6 +232,8 @@ def run():
         query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
         query += f" VALUES(NOW() ,{0} , {0} , {dbConn.lastpick()} , NULL, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
         dbConn.insert(query=query)
+    print(idx_log)
+    idx_log += 1
     
     return jsonify({'result': 'ok', 'cls_list': cls_list, 'infer_no' :dbConn.lastpick(id=0) }) #feedback을 위해서 infer_no도 반환
 
@@ -335,4 +353,4 @@ def test():
 if __name__ == "__main__":
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
     ssl_context.load_cert_chain(certfile='server.crt', keyfile='server.key', password='1234')
-    app.run(host='0.0.0.0', port=5564, ssl_context=ssl_context, debug=False)
+    app.run(host='0.0.0.0', port=5443, ssl_context=ssl_context, debug=True)
