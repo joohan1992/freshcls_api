@@ -32,19 +32,15 @@ cameraName="Camera"
 boardName="Board"
 RTSP=""
 
-item_Kor={'eggplant' : '가지', 'persimmon' : '감', 'potato' : '감자', 'sweetpotato' : '고구마', 
-        'pepper' : '고추', 'sesame' : '깻잎', 'paprika(yellow)' : '파프리카(노랑)', 'carrot' : '당근', 
-        'green onion' : '대파', 'lemon' : '레몬', 'radish' : '무', 'banana' : '바나나', 
-        'broccoli' : '브로콜리', 'paprika(red)' : '파프리카(빨강)', 'apple' : '사과', 'shinemuscat' : '샤인머스캣', 
-        'avocado' : '아보카도', 'babypumpkin' : '애호박', 'cabbage' : '양배추', 'gganonion' : '깐양파',
-        'angganonion' : '안깐양파', 'orange' : '오렌지', 'cucumber' : '오이', 'grape' : '포도', 
-        'garibi' : '가리비', 'gosari' : '고사리', 'gosu' : '고수', 'mushroom' : '느타리버섯', 'daechu' : '대추',
-        'strawberry' : '딸기', 'garlic' : '마늘', 'pear' : '배', 'koreancabbage' : '배추', 'peach' : '복숭아',
-        'sangchu' : '상추', 'sora' : '소라', 'watermelon' : '수박', 'spinach' : '시금치', 'ssukgod' : '쑥갓',
-        'cone' : '옥수수', 'abalone' : '전복', 'trueoutside' : '참외', 'chungkyoungchae' : '청경채', 
-        'paprika(green)' : '파프리카(초록)', 'chicory' : '치커리', 'beannamul' : '콩나물', 'kiwi' : '키위', 
-        'tomato' : '토마토', 'pineapple' : '파인애플', 'pumpkin' : '호박', 'background' : UNDEFMSG , UNDEFMSG : UNDEFMSG
-}
+res = requests.post('https://10.28.100.11:5569/initialize',
+        json={"key": "testauthcode", "store_no": 0
+                }, verify=False)
+result=res.json()['str_label_list']
+item_Kor={}
+for i in result:
+        item_Kor[i[1]]=i[2]
+item_Kor[UNDEFMSG]=UNDEFMSG
+
 ###
 searching=cv2.imread(loadimg,1)
 btclk=False
