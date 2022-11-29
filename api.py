@@ -46,23 +46,18 @@ HUDDLE2=0.5
 UNDEFMSG="Undefined"
 undeflist=["background"]
 
-## 현재는 이렇게 받아오는데 나중에는 요청 들어올때마다 받아와야하나? 아님 미리 메모리에 올려야되나?
-query = "SELECT * FROM str_label"
-dbConn = db_connector.DbConn()
-dbConn.select(query=query)  
-items_label=dbConn.select(query=query)
-label={}
-label_rev={}
-for i in items_label:
-    if i[0]==0:
-        label[str(i[1])]=i[2]
-        label_rev[i[2]]=str(i[1])
 
 ##########################################################################################
 ##########################################################################################
 ##########################################################################################
 
-    
+def authorize(auth_key):
+    query = f"SELECT * FROM auth where auth_cd = '{auth_key}' and act_yn='Y'"
+    dbConn = db_connector.DbConn()
+    result=dbConn.select(query=query)
+    dbConn.__del__()
+    return False if len(result)==0 else True
+
 def FindTopN(predict, N):
     TopN={}
     for j in range(len(predict)):
@@ -78,14 +73,47 @@ def now():
     now = datetime.now()
     string = str(now).replace(":", "-")
     return string[0:10]+"_"+string[11:22]
-
 def current_milli_time():
     return round(time.time() * 1000)
+def sort_predict(predict):
+    """
+    predict의 index와 값을 tuple로 하는 list를
+    내림차순으로 정렬한 값을 반환하는 함수입니다.
+
+    predict(list) : infer한 list
+    """
+    predict_dict={}
+    for i in range(len(predict)):
+        predict_dict[str(i)]=predict[i]
+    predict_dict=(sorted(predict_dict.items(), key=lambda x: x[1], reverse=True))
+    return predict_dict
+
 
 app = Flask(__name__, template_folder='web')
 CORS(app, support_credentials=True)
 
 FLUTTER_WEB_APP = 'web'
+
+@app.route('/initialize', methods=['POST'])
+def initialize():
+
+    request.json() ## 여기서 받아야될것들 store number랑 crudential key, 
+    auth_key=request.json['key']
+    store_no=request.json['store_no']
+    is_auth=authorize(auth_key)
+    if is_auth==False: ##인증
+        return jsonify({'result' : 'Fail'})
+
+    query = f"SELECT label_no,item_label_eng, item_label_kor, item_cd FROM str_label where str_no={store_no}"
+    dbConn = db_connector.DbConn()
+    str_label_list=dbConn.select(query=query)  
+
+    return jsonify({'result': 'ok', 'str_label_list': str_label_list}) #feedback을 위해서 infer_no도 반환
+
+
+@app.route('/web/')
+def render_page_web():
+    return render_template('index.html')
 
 
 @app.route('/web/')
@@ -121,19 +149,15 @@ def run():
     userID=request.json['ID']
     userPW=request.json['PW']
 
-    query = "SELECT * FROM auth"
-    dbConn = db_connector.DbConn()
-    auth_dict_list=dbConn.select(query=query) 
     isauth=False
     if auth=="code":
-        for i in auth_dict_list:
-            if i['auth_cd']==auth_key and i['act_yn'] =="Y":
-                isauth=True
-                break
+        isauth=authorize(auth_key)
     #elif auth=="id"
     #   id/pw 매칭
     if isauth==False: ## 인증키 없으면
-        return jsonify({'result': 'not permission', 'cls_list': None, 'infer_no' :None})
+        return jsonify({'result': 'key is unvalid', 'cls_list': None, 'infer_no' :None})
+
+
     # 파일명 생성 및 이미지 저장
     filename=now()+'.jpg'
     save_file_path = './request_image/'+filename
@@ -240,27 +264,20 @@ def run():
 
 @app.route('/infer_feedback', methods=['POST'])
 def infer_feedback():
-    query = "SELECT * FROM auth"
-    dbConn = db_connector.DbConn()
-    auth_dict_list=dbConn.select(query=query) 
 
     res = request.get_json()
     auth_key=res['key']
-    isauth=False
-    for i in auth_dict_list:
-        if i['auth_cd']==auth_key and i['act_yn'] =="Y":
-            isauth=True
-            break
-    if isauth:
-        feedback=res['feedback']
-        infer_no=res['infer_no']
-        feeback_labelnum=int(label_rev[feedback])
-        dbConn = db_connector.DbConn()
-        query = f"UPDATE infer_history SET feedback = {feeback_labelnum} WHERE infer_no = {infer_no}"
-        dbConn.insert(query=query)    
-        return jsonify({'result': 'ok thanksyou for feedback' })
-    else:
+    isauth=authorize(auth_key)
+    if isauth==False:
         return jsonify({'result': 'key is unvalid' })
+    feedback=res['feedback']
+    infer_no=res['infer_no']
+    feeback_labelnum=int(label_rev[feedback])
+    dbConn = db_connector.DbConn()
+    query = f"UPDATE infer_history SET feedback = {feeback_labelnum} WHERE infer_no = {infer_no}"
+    dbConn.insert(query=query)    
+    return jsonify({'result': 'ok thanksyou for feedback' })
+
 
 @app.route('/get_model', methods=['GET', 'POST'])
 def get_model():
