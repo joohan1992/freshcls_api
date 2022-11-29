@@ -31,9 +31,9 @@ devicenum=0
 cameraName="Camera"
 boardName="Board"
 RTSP=""
-
+STORE_NO=0
 res = requests.post('https://10.28.100.11:5569/initialize',
-        json={"key": "testauthcode", "store_no": 0
+        json={"key": "testauthcode", "store_no": STORE_NO
                 }, verify=False)
 result=res.json()['str_label_list']
 item_Kor={}

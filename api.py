@@ -96,12 +96,17 @@ FLUTTER_WEB_APP = 'web'
 
 @app.route('/initialize', methods=['POST'])
 def initialize():
-
+    res=request.get_json()
+    auth_key=res['key']
+    store_no=res['store_no']
     auth_key=request.json['key']
-    store_no=request.json['store_no']
-    is_auth=authorize(auth_key)
-    if is_auth==False: ##인증
-        return jsonify({'result' : 'Fail'})
+    auth=request.json['auth'] # code or id
+    if auth=="code":
+        isauth=authorize(auth_key)
+    #elif auth=="id"
+    #   id/pw 매칭
+    if isauth==False: ## 인증키 없으면
+        return jsonify({'result': 'Fail'})
 
     query = f"SELECT label_no,item_label_eng, item_label_kor, item_cd FROM str_label where str_no={store_no}"
     dbConn = db_connector.DbConn()
@@ -109,16 +114,13 @@ def initialize():
 
     return jsonify({'result': 'ok', 'str_label_list': str_label_list}) #feedback을 위해서 infer_no도 반환
 
-
 @app.route('/web/')
 def render_page_web():
     return render_template('index.html')
 
-
 @app.route('/web/')
 def render_page_web():
     return render_template('index.html')
-
 
 @app.route('/web/<path:name>')
 def return_flutter_doc(name):
@@ -137,25 +139,23 @@ def return_flutter_doc(name):
 def run():
 
     timecheck=current_milli_time()
-    
-    #json에서 data 받아오기
-    encoded_img=request.json['image']
-    x_size=request.json['x_size']
-    y_size=request.json['y_size']
-    img_channel=request.json['channel']
-    auth_key=request.json['key']
-    auth=request.json['auth'] # code or id
-    userID=request.json['ID']
-    userPW=request.json['PW']
 
-    isauth=False
-    if auth=="code":
+    res=request.get_json()
+    #json에서 data 받아오기
+    encoded_img = res['image']
+    x_size      = res['x_size']
+    y_size      = res['y_size']
+    img_channel = res['channel']
+    userID      = res['ID']
+    userPW      = res['PW']
+    auth_key    = res['key']
+    auth        = res['auth'] # code or id
+    if auth == "code":
         isauth=authorize(auth_key)
     #elif auth=="id"
     #   id/pw 매칭
-    if isauth==False: ## 인증키 없으면
-        return jsonify({'result': 'key is unvalid', 'cls_list': None, 'infer_no' :None})
-
+    if isauth == False: ## 인증키 없으면
+        return jsonify({'result': 'Fail'})
 
     # 파일명 생성 및 이미지 저장
     filename=now()+'.jpg'
@@ -266,16 +266,20 @@ def infer_feedback():
 
     res = request.get_json()
     auth_key=res['key']
-    isauth=authorize(auth_key)
-    if isauth==False:
-        return jsonify({'result': 'key is unvalid' })
+    auth=res['auth'] # code or id
+    if auth=="code":
+        isauth=authorize(auth_key)
+    #elif auth=="id"
+    #   id/pw 매칭
+    if isauth==False: ## 인증키 없으면
+        return jsonify({'result': 'Fail'})
     feedback=res['feedback']
     infer_no=res['infer_no']
     feeback_labelnum=int(label_rev[feedback])
     dbConn = db_connector.DbConn()
     query = f"UPDATE infer_history SET feedback = {feeback_labelnum} WHERE infer_no = {infer_no}"
     dbConn.insert(query=query)    
-    return jsonify({'result': 'ok thanksyou for feedback' })
+    return jsonify({'result': 'ok' })
 
 
 @app.route('/get_model', methods=['GET', 'POST'])
