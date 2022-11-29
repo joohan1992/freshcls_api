@@ -97,7 +97,6 @@ FLUTTER_WEB_APP = 'web'
 @app.route('/initialize', methods=['POST'])
 def initialize():
 
-    request.json() ## 여기서 받아야될것들 store number랑 crudential key, 
     auth_key=request.json['key']
     store_no=request.json['store_no']
     is_auth=authorize(auth_key)
