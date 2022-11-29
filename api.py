@@ -97,10 +97,10 @@ FLUTTER_WEB_APP = 'web'
 @app.route('/initialize', methods=['POST'])
 def initialize():
     res=request.get_json()
-    auth_key=res['key']
-    store_no=res['store_no']
-    auth_key=request.json['key']
-    auth=request.json['auth'] # code or id
+    auth_key = res['key']
+    store_no = res['store_no']
+    auth_key = res['key']
+    auth =     res['auth'] # code or id
     if auth=="code":
         isauth=authorize(auth_key)
     #elif auth=="id"
@@ -265,8 +265,8 @@ def run():
 def infer_feedback():
 
     res = request.get_json()
-    auth_key=res['key']
-    auth=res['auth'] # code or id
+    auth_key = res['key']
+    auth =     res['auth'] # code or id
     if auth=="code":
         isauth=authorize(auth_key)
     #elif auth=="id"
