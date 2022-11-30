@@ -33,7 +33,7 @@ model_no=dbConn.select(query=query)[0][0]
 
 query = f'SELECT model_path FROM ensemble_model where model_no={model_no}'
 ensemble_list=dbConn.select(query=query)
-
+del(dbConn)
 modelnum=len(ensemble_list)
 modellist=[]
 
@@ -50,7 +50,7 @@ def authorize(auth_key):
     query = f"SELECT * FROM auth where auth_cd = '{auth_key}' and act_yn='Y'"
     dbConn = db_connector.DbConn()
     result=dbConn.select(query=query)
-    dbConn.__del__()
+    del(dbConn)
     return False if len(result)==0 else True
 
 
@@ -107,7 +107,8 @@ def initialize():
     query+= f" model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no where model_label.model_no={model_no}" #modelnum
     
     str_label_list=dbConn.select(query=query)
-    dbConn.__del__
+    str_label_list.append([-1, 'Undefined', 'Undefined','None'])
+    del(dbConn)
 
     return jsonify({'result': 'ok', 'str_label_list': str_label_list}) #feedback을 위해서 infer_no도 반환
 
@@ -260,12 +261,11 @@ def run():
         dbConn.insert(query=query)
 
     infer_no=dbConn.lastpick(id=0)
-    
+    del(dbConn)
     return jsonify({'result': 'ok', 'cls_list': cls_list, 'infer_no' :infer_no }) #feedback을 위해서 infer_no도 반환
 
 @app.route('/infer_feedback', methods=['POST'])
 def infer_feedback():
-
     res = request.get_json()
     auth_key = res['key']
     auth =     res['auth'] # code or id
@@ -281,6 +281,7 @@ def infer_feedback():
     dbConn = db_connector.DbConn()
     query = f"UPDATE infer_history SET feedback = {feedback} WHERE infer_no = {infer_no}"
     dbConn.insert(query=query)
+    del(dbConn)
     return jsonify({'result': 'ok' })
 
 
@@ -302,7 +303,7 @@ def get_model():
     dbConn = db_connector.DbConn()
     # 쿼리 실행
     result = dbConn.select(query)
-
+    del(dbConn)
     # 결과 반환
     return jsonify({'result': 'ok', 'value': result})
 
@@ -344,7 +345,7 @@ def login():
         auth_result = 'ok'
     else:
         auth_result = 'fail'
-
+    del(dbConn)
     return jsonify({'result': auth_lst, 'authorization_result' : auth_result})
 
 
@@ -369,7 +370,7 @@ def test():
     result = dbConn.selectAsDict(query)
 
     print(result)
-
+    del(dbConn)
     return jsonify({'result': 'ok'})
 
 

@@ -35,12 +35,13 @@ res = requests.post(INIT_URL,
         json={"key": "testauthcode", "store_no": STORE_NO, "auth" : "code"
                 }, verify=False) ## 나중에 ID 랑 PW 도 보내야됨(NONE으로)
 result=res.json()['str_label_list']
-item_Eng={-1 : UNDEFMSG}
-item_Kor={-1 : UNDEFMSG}
+item_Eng={}
+item_Kor={}
 for i in result:
     item_Eng[i[0]]=i[1]
     item_Kor[i[0]]=i[2]    
-item_Kor[UNDEFMSG]=UNDEFMSG
+item_Kor[-1]=UNDEFMSG
+item_Eng[-1]=UNDEFMSG
 
 # 리스트 순회하면서 0번째 -> 1번째 (영어)
 # 리스트 순회하면서 0번째 -> 2번째 (한글)
@@ -220,10 +221,11 @@ while(True):
                     json={  "feedback" : cls_list[0],
                             "infer_no":infer_no,
                             "key":CRUDENTIAL_KEY,
+                            "auth" : "code"
                             }, verify=False)
             print(res.json()['result'])
             phase=3
-            
+
         if phase==22:
             label_to_board(item_num=1,item=Result2_IMG,label1=cv2.imread("./fruitlabels/"+item_Eng[cls_list[1]]+".png",1))
             cv2.imshow(BOARD_NAME,Result2_IMG)
@@ -231,6 +233,7 @@ while(True):
                     json={  "feedback" : cls_list[1],
                             "infer_no":infer_no,
                             "key":CRUDENTIAL_KEY,
+                            "auth" : "code"
                             }, verify=False)
             print(res.json()['result'])
             phase=3
