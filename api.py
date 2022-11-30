@@ -200,8 +200,6 @@ def run():
                         } #각 모델들의 1순위들 index (seq)
 
     cls_list = [] #마지막에 request로 전송할 결과값 (label)
-
-
     # undeflist 받아오기 (seq로)
     query = "SELECT model_label.label_seq FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE item_label.valid_yn = 'N'"
     undeflist = [data for inner_list in dbConn.select(query=query) for data in inner_list]
@@ -211,7 +209,7 @@ def run():
         query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
         result=dbConn.execute(query=query)[0][0]         
         cls_list.append(result)
-        phase=0
+        phase=1
     elif predicted_list[0][1]>HUDDLE1*modelnum: ##1개만 출력
         seq=predicted_list[0][0]
         query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
@@ -243,19 +241,18 @@ def run():
     ## 영어이름으로줌
     timecheck=current_milli_time()-timecheck
     #반환값이 seq인데 이걸 label_no로 변환해서 줘야한다.
-    result=[]
-
+    
     if phase==0: #undefined
         query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
         query += f" VALUES(NOW() ,{str_no} , {0} , {img_no} , {-1}, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
         dbConn.insert(query=query)
     elif phase==1: #1 items infer
         query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
-        query += f" VALUES(NOW() ,{str_no} , {0} , {img_no} , {result[0]}, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
+        query += f" VALUES(NOW() ,{str_no} , {0} , {img_no} , {cls_list[0]}, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
         dbConn.insert(query=query)
     elif phase==2: #2 items infer
         query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
-        query += f" VALUES(NOW() ,{str_no} , {0} , {img_no} , {result[0]}, {result[1]} , {timecheck} ,NOW(), NULL) RETURNING infer_no"
+        query += f" VALUES(NOW() ,{str_no} , {0} , {img_no} , {cls_list[0]}, {cls_list[1]} , {timecheck} ,NOW(), NULL) RETURNING infer_no"
         dbConn.insert(query=query)
     else: # error
         query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
@@ -264,7 +261,7 @@ def run():
 
     infer_no=dbConn.lastpick(id=0)
     
-    return jsonify({'result': 'ok', 'cls_list': result, 'infer_no' :infer_no }) #feedback을 위해서 infer_no도 반환
+    return jsonify({'result': 'ok', 'cls_list': cls_list, 'infer_no' :infer_no }) #feedback을 위해서 infer_no도 반환
 
 @app.route('/infer_feedback', methods=['POST'])
 def infer_feedback():
@@ -379,4 +376,4 @@ def test():
 if __name__ == "__main__":
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
     ssl_context.load_cert_chain(certfile='server.crt', keyfile='server.key', password='1234')
-    app.run(host='0.0.0.0', port=5443, ssl_context=ssl_context, debug=True)
+    app.run(host='0.0.0.0', port=5443, ssl_context=ssl_context, debug=False)
