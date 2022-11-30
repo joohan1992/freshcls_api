@@ -41,11 +41,7 @@ for i in ensemble_list:
     modellist.append(load_model(i[3]))
 
 HUDDLE1=0.8
-HUDDLE2=0.5
-
-UNDEFMSG="Undefined"
-undeflist=["background"]
-
+HUDDLE2=0.7
 
 ##########################################################################################
 ##########################################################################################
@@ -191,38 +187,49 @@ def run():
 
     cls_list = [] #마지막에 request로 전송할 결과값 (label)
 
-    query = "SELECT model_label.label_no, item_label.label_nm_eng, item_label.label_nm_kor FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {}"
-    dbConn.execute(query=query)[0] #[[1, 'pear', '배']]
 
-    if predicted_list[0][0] in undeflist: ##1순위가 undef thing일때 
-        cls_list.append(predicted_class[0])
+    # undeflist 받아오기 (seq로)
+    query = "SELECT model_label.label_seq FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE item_label.valid_yn = 'N'"
+    undeflist = [data for inner_list in dbConn.select(query=query) for data in inner_list]
+
+    if predicted_list[0][0] in undeflist: ##1순위가 undef thing일때 (얘는 undefthing label number를 반환)
+        seq=predicted_list[0][0]
+        query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
+        result=dbConn.execute(query=query)[0][0]         
+        cls_list.append(result)
         phase=0
     elif predicted_list[0][1]>HUDDLE1*modelnum: ##1개만 출력
-        cls_list.append(predicted_list[0][0])
+        seq=predicted_list[0][0]
+        query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
+        result=dbConn.execute(query=query)[0][0]
+        cls_list.append(result)
         phase=1
-    elif len(max_predicted_set)==modelnum: #undef출력
-        cls_list.append(UNDEFMSG)
+    elif len(max_predicted_set)==modelnum: #undef출력 : -1 
+        cls_list.append(-1)
         phase=0
-    elif max(max(m1),max(m2),max(m3),max(m4)) < HUDDLE2: #undef출력
-        cls_list.append(UNDEFMSG)
+    elif max(max(m1),max(m2),max(m3),max(m4)) < HUDDLE2: #undef출력 : -1
+        cls_list.append(-1)
         phase=0
-    elif (predicted_list[0][1]+predicted_list[1][1]) > HUDDLE2*modelnum :##2개합쳐서 2(*4)넘을때도하자
-        cls_list.append(predicted_list[0][0]) 
-        if predicted_class[1] in undeflist: # 1개
+    elif (predicted_list[0][1]+predicted_list[1][1]) > HUDDLE2*modelnum :##2개합쳐서 huddle2*4넘을때도하자
+        seq=predicted_list[0][0]
+        query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
+        result=dbConn.execute(query=query)[0][0]
+        cls_list.append(result)
+        if predicted_list[1][0] in undeflist: # 2순위가 undef일때
             phase=1
         else:
-            cls_list.append(predicted_list[1][0]) #2개
+            seq=predicted_list[1][0]
+            query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
+            result=dbConn.execute(query=query)[0][0]
+            cls_list.append(result)
             phase=2
     else:
-        cls_list.append(UNDEFMSG)  
+        cls_list.append(-1)  
         phase=0
     ## 영어이름으로줌
     timecheck=current_milli_time()-timecheck
     #반환값이 seq인데 이걸 label_no로 변환해서 줘야한다.
     result=[]
-    for seq in cls_list: ## seq -> label
-        query = f"select label_no from str_label WHERE label_seq={seq} and str_no={str_no}"
-        result.append(dbConn.select(query=query)[0][0])
 
     if phase==0: #undefined
         query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
@@ -242,13 +249,6 @@ def run():
         dbConn.insert(query=query)
 
     infer_no=dbConn.lastpick(id=0)
-
-    # for i in ind_prob:
-    #     m1top2[list(m1top2)[i]]
-    #     query = "INSERT INTO ensemble_infer_history(infer_no, image_no, result1,result2,result1_prob,result2_prob,ensemble_model_no)"
-    #     query += f" VALUES({infer_no},{img_no},{list(m1top2)[i]},{},{},{},{model_no[0][0]}) RETURNING infer_no"
-    #     dbConn.insert(query=query)
-
     
     return jsonify({'result': 'ok', 'cls_list': result, 'infer_no' :infer_no }) #feedback을 위해서 infer_no도 반환
 
@@ -264,11 +264,11 @@ def infer_feedback():
     #   id/pw 매칭
     if isauth==False: ## 인증키 없으면
         return jsonify({'result': 'Fail'})
-    feedback=res['feedback']
+    feedback=res['feedback'] # client랑 소통하는건 label_no으로만
     infer_no=res['infer_no']
-    feeback_labelnum=int(label_rev[feedback])
+    
     dbConn = db_connector.DbConn()
-    query = f"UPDATE infer_history SET feedback = {feeback_labelnum} WHERE infer_no = {infer_no}"
+    query = f"UPDATE infer_history SET feedback = {feedback} WHERE infer_no = {infer_no}"
     dbConn.insert(query=query)
     return jsonify({'result': 'ok' })
 
