@@ -166,7 +166,7 @@ def run():
             list_bytes.append(int(item))
         data = np.array(list_bytes, dtype=np.uint8).reshape((int(y_size), int(x_size), -1))[:, :, :3]
     else:
-        data = np.frombuffer(bytes_to_numpy).reshape((y_size, x_size, img_channel))
+        data = np.frombuffer(bytes_to_numpy, dtype=np.uint8).reshape((y_size, x_size, img_channel))
     cv2.imwrite(save_file_path, data)
     
     # insert image data into db
