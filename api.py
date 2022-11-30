@@ -49,7 +49,6 @@ undeflist=["background"]
 
 ##########################################################################################
 ##########################################################################################
-##########################################################################################
 
 def authorize(auth_key):
     query = f"SELECT * FROM auth where auth_cd = '{auth_key}' and act_yn='Y'"
@@ -58,17 +57,7 @@ def authorize(auth_key):
     dbConn.__del__()
     return False if len(result)==0 else True
 
-def FindTopN(predict, N):
-    TopN={}
-    for j in range(len(predict)):
-        if len(TopN)<N:
-            TopN[label[str(j)]]=round(100*predict[j],2)
-        else:
-            if round(100*predict[j],2)>min(TopN.values()):
-                del(TopN[min(TopN, key=TopN.get)])
-                TopN[label[str(j)]]=round(100*predict[j],2)
-    TopN=dict(sorted(TopN.items(), key=lambda x: x[1], reverse=True))
-    return TopN
+
 def now():
     now = datetime.now()
     string = str(now).replace(":", "-")
@@ -79,12 +68,13 @@ def sort_predict(predict):
     """
     predict의 index와 값을 tuple로 하는 list를
     내림차순으로 정렬한 값을 반환하는 함수입니다.
-
+    
     predict(list) : infer한 list
+    return : [(seq , prob), ...]
     """
     predict_dict={}
     for i in range(len(predict)):
-        predict_dict[str(i)]=predict[i]
+        predict_dict[i]=predict[i]
     predict_dict=(sorted(predict_dict.items(), key=lambda x: x[1], reverse=True))
     return predict_dict
 
@@ -134,12 +124,9 @@ def return_flutter_doc(name):
 
     return send_from_directory(DIR_NAME, datalist[-1])
 
-
 @app.route('/run', methods=['POST'])
 def run():
-
     timecheck=current_milli_time()
-
     res=request.get_json()
     #json에서 data 받아오기
     encoded_img = res['image']
@@ -149,6 +136,7 @@ def run():
     userID      = res['ID']
     userPW      = res['PW']
     auth_key    = res['key']
+    str_no      = res['store_no']
     auth        = res['auth'] # code or id
     if auth == "code":
         isauth=authorize(auth_key)
@@ -165,89 +153,92 @@ def run():
         save_file_path = './request_image/'+filename
     print(save_file_path)
 
-    # string to bytes
+    # string to bytes & write
     string_to_bytes = encoded_img.encode(encoding)
     bytes_to_numpy = base64.decodebytes(string_to_bytes)
     data = np.frombuffer(bytes_to_numpy, dtype='uint8').reshape((y_size, x_size, img_channel))
     cv2.imwrite(save_file_path,data)
     
+    # insert image data into db
     query = "INSERT INTO img_data(date,time,resol_x,resol_y,file_path)"
     query += f" VALUES(NOW() ,NOW() , {x_size} , {y_size}, '{save_file_path[1:]}' ) RETURNING image_no"
     dbConn = db_connector.DbConn()
     dbConn.insert(query=query)        
-    img_no=dbConn.lastpick()
-    ## 이미지전처리
+    img_no=dbConn.lastpick() # pick image no
+
+
+    ## img resize
     data_resize=cv2.resize(data,(299,299))
     predict_img = cv2.cvtColor(data_resize,cv2.COLOR_BGR2RGB)  
     x = image.image_utils.img_to_array(predict_img)
-    x = np.expand_dims(x, axis = 0)     ## efficientnet일 경우
+    x = np.expand_dims(x, axis = 0)     ## efficientnet일 경우 preprocessing 필요 x
     ## preprocessing 없는 모델은 여기서 추론
     m4=modellist[3].predict(x,verbose = 0)[0]
     ## preprocessing 필요하면 여기서 추론
     x = preprocess_input(x)
     m1=modellist[0].predict(x,verbose = 0)[0]   
     m2=modellist[1].predict(x,verbose = 0)[0]   
-    m3=modellist[2].predict(x,verbose = 0)[0]   
-    features=sum(modellist)
-    predicted_list=features
-    predicted_class=[]
-    predicted_set = { 
-                        label[str(np.argmax(m1))],
-                        label[str(np.argmax(m2))],
-                        label[str(np.argmax(m3))],
-                        label[str(np.argmax(m4))]
-                        }
-    top2=FindTopN(predicted_list,2)
-    predicted_class=list(top2.keys())
-    
+    m3=modellist[2].predict(x,verbose = 0)[0]  
 
-    # ind_prob=[]
-    # ind_prob.append(FindTopN(m1,2))
-    # ind_prob.append(FindTopN(m2,2))
-    # ind_prob.append(FindTopN(m3,2))
-    # ind_prob.append(FindTopN(m4,2))
+    features=m1+m2+m3+m4 # 4개의 softmax값을 다 더한것
+    predicted_list=sort_predict(features) # 내림차순으로 정렬
+    max_predicted_set = { 
+                        np.argmax(m1),
+                        np.argmax(m2),
+                        np.argmax(m3),
+                        np.argmax(m4)
+                        } #각 모델들의 1순위들 index (seq)
 
-    cls_list = [] #마지막에 request로 전송할 결과값
-    if predicted_class[0] in undeflist: ##1순위가 undef thing일때
+    cls_list = [] #마지막에 request로 전송할 결과값 (label)
+
+    query = "SELECT model_label.label_no, item_label.label_nm_eng, item_label.label_nm_kor FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {}"
+    dbConn.execute(query=query)[0] #[[1, 'pear', '배']]
+
+    if predicted_list[0][0] in undeflist: ##1순위가 undef thing일때 
         cls_list.append(predicted_class[0])
         phase=0
-    elif max(predicted_list)>HUDDLE1*modelnum: ##1개만 출력
-        cls_list.append(predicted_class[0])
+    elif predicted_list[0][1]>HUDDLE1*modelnum: ##1개만 출력
+        cls_list.append(predicted_list[0][0])
         phase=1
-    elif len(predicted_set)==modelnum: #undef출력
+    elif len(max_predicted_set)==modelnum: #undef출력
         cls_list.append(UNDEFMSG)
         phase=0
     elif max(max(m1),max(m2),max(m3),max(m4)) < HUDDLE2: #undef출력
         cls_list.append(UNDEFMSG)
         phase=0
-    elif max(predicted_list)>HUDDLE2*2 :##2개합쳐서 2(*4)넘을때도하자
-        cls_list.append(predicted_class[0]) 
+    elif (predicted_list[0][1]+predicted_list[1][1]) > HUDDLE2*modelnum :##2개합쳐서 2(*4)넘을때도하자
+        cls_list.append(predicted_list[0][0]) 
         if predicted_class[1] in undeflist: # 1개
             phase=1
         else:
-            cls_list.append(predicted_class[1]) #2개
+            cls_list.append(predicted_list[1][0]) #2개
             phase=2
     else:
         cls_list.append(UNDEFMSG)  
         phase=0
     ## 영어이름으로줌
     timecheck=current_milli_time()-timecheck
+    #반환값이 seq인데 이걸 label_no로 변환해서 줘야한다.
+    result=[]
+    for seq in cls_list: ## seq -> label
+        query = f"select label_no from str_label WHERE label_seq={seq} and str_no={str_no}"
+        result.append(dbConn.select(query=query)[0][0])
 
     if phase==0: #undefined
         query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
-        query += f" VALUES(NOW() ,{0} , {0} , {img_no} , {-1}, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
+        query += f" VALUES(NOW() ,{str_no} , {0} , {img_no} , {-1}, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
         dbConn.insert(query=query)
     elif phase==1: #1 items infer
         query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
-        query += f" VALUES(NOW() ,{0} , {0} , {img_no} , {int(label_rev[cls_list[0]])}, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
+        query += f" VALUES(NOW() ,{str_no} , {0} , {img_no} , {result[0]}, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
         dbConn.insert(query=query)
     elif phase==2: #2 items infer
         query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
-        query += f" VALUES(NOW() ,{0} , {0} , {img_no} , {int(label_rev[cls_list[0]])}, {int(label_rev[cls_list[1]])} , {timecheck} ,NOW(), NULL) RETURNING infer_no"
+        query += f" VALUES(NOW() ,{str_no} , {0} , {img_no} , {result[0]}, {result[1]} , {timecheck} ,NOW(), NULL) RETURNING infer_no"
         dbConn.insert(query=query)
     else: # error
         query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
-        query += f" VALUES(NOW() ,{0} , {0} , {img_no} , NULL, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
+        query += f" VALUES(NOW() ,{str_no} , {0} , {img_no} , NULL, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
         dbConn.insert(query=query)
 
     infer_no=dbConn.lastpick(id=0)
@@ -259,7 +250,7 @@ def run():
     #     dbConn.insert(query=query)
 
     
-    return jsonify({'result': 'ok', 'cls_list': cls_list, 'infer_no' :infer_no }) #feedback을 위해서 infer_no도 반환
+    return jsonify({'result': 'ok', 'cls_list': result, 'infer_no' :infer_no }) #feedback을 위해서 infer_no도 반환
 
 @app.route('/infer_feedback', methods=['POST'])
 def infer_feedback():
@@ -278,7 +269,7 @@ def infer_feedback():
     feeback_labelnum=int(label_rev[feedback])
     dbConn = db_connector.DbConn()
     query = f"UPDATE infer_history SET feedback = {feeback_labelnum} WHERE infer_no = {infer_no}"
-    dbConn.insert(query=query)    
+    dbConn.insert(query=query)
     return jsonify({'result': 'ok' })
 
 
