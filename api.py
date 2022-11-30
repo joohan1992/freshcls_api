@@ -29,16 +29,16 @@ os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 query = "SELECT model_no FROM model where model_nm='ensemble'"
 dbConn = db_connector.DbConn()
-model_no=dbConn.select(query=query)
+model_no=dbConn.select(query=query)[0][0]
 
-query = f'SELECT * FROM ensemble_model where model_no={model_no[0][0]}'
+query = f'SELECT model_path FROM ensemble_model where model_no={model_no}'
 ensemble_list=dbConn.select(query=query)
 
 modelnum=len(ensemble_list)
 modellist=[]
 
-for i in ensemble_list:
-    modellist.append(load_model(i[3]))
+for path in ensemble_list:
+    modellist.append(load_model(path))
 
 HUDDLE1=0.8
 HUDDLE2=0.7
@@ -85,18 +85,29 @@ def initialize():
     res=request.get_json()
     auth_key = res['key']
     store_no = res['store_no']
-    auth_key = res['key']
-    auth =     res['auth'] # code or id
+    auth =     res['auth'] # code or id (나중에 ID랑 PW도 받아야됨)
     if auth=="code":
         isauth=authorize(auth_key)
     #elif auth=="id"
     #   id/pw 매칭
     if isauth==False: ## 인증키 없으면
         return jsonify({'result': 'Fail'})
-
-    query = f"SELECT label_no,item_label_eng, item_label_kor, item_cd FROM str_label where str_no={store_no}"
+    
+    # 전달받은 store_no로 사용하고 있는 model_no 찾기
+    query = f"SELECT model_no, act_yn from model where str_no={store_no} and use_yn= 'Y'"
     dbConn = db_connector.DbConn()
+
+    model_no = dbConn.select(query=query)[0][0]   ##model_no
+    model_state= dbConn.select(query=query)[0][1] ##act_yn
+
+    if model_state == "N":
+        return jsonify({'result': 'Fail'})
+
+    query = "SELECT model_label.label_no, item_label.label_nm_eng, item_label.label_nm_kor, item_cd FROM" # 라벨 / 영어 / 한글 / 아이템코드 전달(해당모델)
+    query+= f" model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no where model_label.model_no={model_no}" #modelnum
+    
     str_label_list=dbConn.select(query=query)
+    dbConn.__del__
 
     return jsonify({'result': 'ok', 'str_label_list': str_label_list}) #feedback을 위해서 infer_no도 반환
 
