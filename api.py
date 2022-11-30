@@ -36,10 +36,13 @@ ensemble_list=dbConn.select(query=query)
 del(dbConn)
 modelnum=len(ensemble_list)
 modellist=[]
-
+model_pre=[]
 for path in ensemble_list:
     modellist.append(load_model(path[0]))
-
+    if path[0] in "effi":
+        model_pre.append(1)
+    else:
+        model_pre.append(0)    
 HUDDLE1=0.8
 HUDDLE2=0.7
 
@@ -262,64 +265,68 @@ def run():
 
     infer_no=dbConn.lastpick(id=0)
 
-    sort_predict(m1)
-    seq=m1[0][0]
+    ## 앙상블 모델별 추론결과 저장
+    sort_m1=sort_predict(m1)
+    seq=sort_m1[0][0]
     query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
     m1_result1=dbConn.execute(query=query)[0][0]
-
-    seq=m1[1][0]
+    seq=sort_m1[1][0]
     query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
     m1_result2=dbConn.execute(query=query)[0][0]
-
     # prob 1,2 (점수)
-    m1_prob1=m1[0][1]
-    m1_prob2=m1[1][1]
+    m1_prob1=sort_m1[0][1]
+    m1_prob2=sort_m1[1][1]
     query = "INSERT INTO ensemble_infer_history(infer_no, image_no, result1, result2, result1_prob, result2_prob,ensemble_model_no)"
     query += f" VALUES({infer_no} ,{img_no},{m1_result1},{m1_result2},{m1_prob1},{m1_prob2},{1} ) "
-    
-    sort_predict(m2)
-    seq=m2[0][0]
+    dbConn.insert(query=query)
+
+    sort_m2=sort_predict(m2)
+    seq=sort_m2[0][0]
     query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
     m2_result1=dbConn.execute(query=query)[0][0]
-
-    seq=m2[1][0]
+    seq=sort_m2[1][0]
     query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
     m2_result2=dbConn.execute(query=query)[0][0]
-
     # prob 1,2 (점수)
-    m2_prob1=m2[0][1]
-    m2_prob2=m2[1][1]
+    m2_prob1=sort_m2[0][1]
+    m2_prob2=sort_m2[1][1]
     query = "INSERT INTO ensemble_infer_history(infer_no, image_no, result1, result2, result1_prob, result2_prob,ensemble_model_no)"
-    query += f" VALUES({infer_no} ,{img_no},{m2_result1},{m2_result2},{m2_prob1},{m2_prob2},{1} ) "
-    sort_predict(m3)
-    seq=m3[0][0]
+    query += f" VALUES({infer_no} ,{img_no},{m2_result1},{m2_result2},{m2_prob1},{m2_prob2},{2} ) "
+    dbConn.insert(query=query)
+
+    sort_m3=sort_predict(m3)
+    seq=sort_m3[0][0]
     query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
     m3_result1=dbConn.execute(query=query)[0][0]
-
-    seq=m3[1][0]
+    seq=sort_m3[1][0]
     query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
     m3_result2=dbConn.execute(query=query)[0][0]
-
     # prob 1,2 (점수)
-    m3_prob1=m3[0][1]
-    m3_prob2=m3[1][1]
+    m3_prob1=sort_m3[0][1]
+    m3_prob2=sort_m3[1][1]
     query = "INSERT INTO ensemble_infer_history(infer_no, image_no, result1, result2, result1_prob, result2_prob,ensemble_model_no)"
-    query += f" VALUES({infer_no} ,{img_no},{m3_result1},{m3_result2},{m3_prob1},{m3_prob2},{1} ) "
-    sort_predict(m4)
-    seq=m4[0][0]
+    query += f" VALUES({infer_no} ,{img_no},{m3_result1},{m3_result2},{m3_prob1},{m3_prob2},{3} ) "
+    dbConn.insert(query=query)
+
+    sort_m4=sort_predict(m4)
+    seq=sort_m4[0][0]
     query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
     m4_result1=dbConn.execute(query=query)[0][0]
-
-    seq=m4[1][0]
+    seq=sort_m4[1][0]
     query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
     m4_result2=dbConn.execute(query=query)[0][0]
-
     # prob 1,2 (점수)
-    m4_prob1=m4[0][1]
-    m4_prob2=m4[1][1]
+    m4_prob1=sort_m4[0][1]
+    m4_prob2=sort_m4[1][1]
     query = "INSERT INTO ensemble_infer_history(infer_no, image_no, result1, result2, result1_prob, result2_prob,ensemble_model_no)"
-    query += f" VALUES({infer_no} ,{img_no},{m4_result1},{m4_result2},{m4_prob1},{m4_prob2},{1} ) "
-
+    query += f" VALUES({infer_no} ,{img_no},{m4_result1},{m4_result2},{m4_prob1},{m4_prob2},{4} ) "
+    dbConn.insert(query=query)
+    
+    print(sort_m1)
+    print(sort_m2)
+    print(sort_m3)
+    print(sort_m4)
+    
     del(dbConn)
     return jsonify({'result': 'ok', 'cls_list': cls_list, 'infer_no' :infer_no }) #feedback을 위해서 infer_no도 반환
 
