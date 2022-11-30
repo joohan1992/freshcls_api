@@ -28,20 +28,33 @@ DEVICENUM=0
 CAM_NAME="Camera"
 BOARD_NAME="Board"
 RTSP=""
+STORE_NO=0
+res = requests.post('https://10.28.100.11:5569/initialize',
+        json={"key": "testauthcode", "store_no": STORE_NO
+                }, verify=False)
+result=res.json()['str_label_list']
+item_Kor={}
+for i in result:
+        item_Kor[i[1]]=i[2]
+item_Kor[UNDEFMSG]=UNDEFMSG
 
-itemKor={'eggplant' : '가지', 'persimmon' : '감', 'potato' : '감자', 'sweetpotato' : '고구마', 
-        'pepper' : '고추', 'sesame' : '깻잎', 'paprika(yellow)' : '파프리카(노랑)', 'carrot' : '당근', 
-        'green onion' : '대파', 'lemon' : '레몬', 'radish' : '무', 'banana' : '바나나', 
-        'broccoli' : '브로콜리', 'paprika(red)' : '파프리카(빨강)', 'apple' : '사과', 'shinemuscat' : '샤인머스캣', 
-        'avocado' : '아보카도', 'babypumpkin' : '애호박', 'cabbage' : '양배추', 'gganonion' : '깐양파',
-        'angganonion' : '안깐양파', 'orange' : '오렌지', 'cucumber' : '오이', 'grape' : '포도', 
-        'garibi' : '가리비', 'gosari' : '고사리', 'gosu' : '고수', 'mushroom' : '느타리버섯', 'daechu' : '대추',
-        'strawberry' : '딸기', 'garlic' : '마늘', 'pear' : '배', 'koreancabbage' : '배추', 'peach' : '복숭아',
-        'sangchu' : '상추', 'sora' : '소라', 'watermelon' : '수박', 'spinach' : '시금치', 'ssukgod' : '쑥갓',
-        'cone' : '옥수수', 'abalone' : '전복', 'trueoutside' : '참외', 'chungkyoungchae' : '청경채', 
-        'paprika(green)' : '파프리카(초록)', 'chicory' : '치커리', 'beannamul' : '콩나물', 'kiwi' : '키위', 
-        'tomato' : '토마토', 'pineapple' : '파인애플', 'pumpkin' : '호박', 'background' : UNDEFMSG , UNDEFMSG : UNDEFMSG
-}
+# 리스트 순회하면서 0번째 -> 1번째 (영어)
+# 리스트 순회하면서 0번째 -> 2번째 (한글)
+# 리스트 순회하면서 0번째 -> 3번째 (코드)
+''' 예시
+[[9, 'eggplant', '가지', '880008'], [23, 'persimmon', '감', '880022'], [30, 'potato', '감자', '880029'],
+[4, 'sweetpotato', '고구마', '880003'], [15, 'pepper', '고추', '880014'], [12, 'sesame', '깻잎', '880011'],
+[14, 'paprika(yellow)', '파프리카(노랑)', '880013'], [26, 'carrot', '당근', '880025'], [39, 'green onion', '대파', '880038'],
+[43, 'lemon', '레몬', '880042'], [34, 'radish', '무', '880033'], [50, 'banana', '바나나', '880049'],
+[48, 'broccoli', '브로콜리', '880047'], [29, 'paprika(red)', '파프리카(빨강)', '880028'], [32, 'apple', '사과', '880031'],
+[42, 'shinemuscat', '샤인머스캣', '880041'], [7, 'avocado', '아보카도', '880006'], [21, 'babypumpkin', '애호박', '880020'],
+[18, 'cabbage', '양배추', '880017'], [24, 'gganonion', '깐양파', '880023'], [40, 'angganonion', '안깐양파', '880039'],
+[22, 'orange', '오렌지', '880021'], [13, 'cucumber', '오이', '880012'], [38, 'grape', '포도', '880037'],
+[27, 'garibi', '가리비', '880026'], [47, 'gosari', '고사리', '880046'], [36, 'gosu', '고수', '880035'],
+[51, 'mushroom', '느타리버섯', '880050'], [46, 'daechu', '대추', '880045'], [44, 'strawberry', '딸기', '880043'],
+[25, 'garlic', '마늘', '880024'], [1, 'pear', '배', '880000'], [45, 'koreancabbage', '배추', '880044'], [37, 'peach', '복숭아', '880036'], 
+[5, 'sangchu', '상추', '880004'], [10, 'sora', '소라', '880009'], [31, 'watermelon', '수박', '880030']
+'''
 ###
 searching=cv2.imread(LOADIMGSRC,1)
 btclk=False
