@@ -32,7 +32,9 @@ BOARD_NAME="Board"
 RTSP=""
 STORE_NO=0
 res = requests.post(INIT_URL,
-        json={"key": "testauthcode", "store_no": STORE_NO, "auth" : "code"
+        json={  "key": CRUDENTIAL_KEY,
+                "store_no": STORE_NO, 
+                "auth" : "code"
                 }, verify=False) ## 나중에 ID 랑 PW 도 보내야됨(NONE으로)
 result=res.json()['str_label_list']
 item_Eng={}
