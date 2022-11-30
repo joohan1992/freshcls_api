@@ -18,18 +18,15 @@ CRUDENTIAL_KEY="7{@:M8IR;DW\\/X71uhHOd[nxa@uB%+m(/<Owq5LZ.kO%K583{t-fDb'GkE$YscX
 
 print("Program Starting")
 ###
-logsrc="C:\\TOMATO\\POS\\cameradata.txt"
-logtxt="./log.txt"
-loadimg="C:\\TOMATO\\POS\\SRC\\searching.jpg"
+LOGSRC="C:\\TOMATO\\POS\\cameradata.txt"
+LOADIMGSRC="C:\\TOMATO\\POS\\SRC\\searching.jpg"
 UNDEFMSG="Undefined"
-cameraX=1300
-cameraY=28
-textX=0.1    #0 to 1
-textY=0.7    #0 to 1
-imgsize=(280,210)
-devicenum=0 
-cameraName="Camera"
-boardName="Board"
+CAM_MOVE_X=1300
+CAM_MOVE_Y=28
+IMGSIZE=(280,210)
+DEVICENUM=0 
+CAM_NAME="Camera"
+BOARD_NAME="Board"
 RTSP=""
 STORE_NO=0
 res = requests.post('https://10.28.100.11:5569/initialize',
@@ -59,13 +56,12 @@ item_Kor[UNDEFMSG]=UNDEFMSG
 [5, 'sangchu', '상추', '880004'], [10, 'sora', '소라', '880009'], [31, 'watermelon', '수박', '880030']
 '''
 ###
-searching=cv2.imread(loadimg,1)
+searching=cv2.imread(LOADIMGSRC,1)
 btclk=False
 btctrl=False
 isCapt=False
 isWrite=False
 phase=0
-failnum=0
 camerastate=0
 
 f_config = open('./config.txt', 'r')
@@ -75,24 +71,39 @@ sp_lines = lines.split('\n')
 for line in sp_lines:
     token = line.split('\t')
     title = token[0]
-    if title == 'devicenum':
-        devicenum = int(token[1])
+    if title == 'DEVICENUM':
+        DEVICENUM = int(token[1])
     elif title == 'RTSP':
         RTSP = str(token[1])
     elif title == 'URL':
         URL = str(token[1])
+    elif title == 'CAM_MOVE_X':
+        CAM_MOVE_X = str(token[1])
+    elif title == 'CAM_MOVE_Y':
+        CAM_MOVE_Y = str(token[1])
+    elif title == 'CAM_NAME':
+        CAM_NAME = str(token[1])
+    elif title == 'BOARD_NAME':
+        BOARD_NAME = str(token[1])        
+    elif title == 'LOGSRC':
+        LOGSRC = str(token[1])
+    elif title == 'LOADIMGSRC':
+        LOADIMGSRC = str(token[1])    
     elif title == 'KEY':
         CRUDENTIAL_KEY = str(token[1])
     elif title == 'Undefined Message':
         UNDEFMSG = str(token[1])
+    elif title == 'IMGSIZE':
+        IMGSIZE = ( int(str(token[1]).replace("(","").replace(")","").split(",")[0]),
+                    int(str(token[1]).replace("(","").replace(")","").split(",")[1]))
 
 print("Function Loading")
 
-def findko(item):
-    global item_Kor
-    return item_Kor[item]
-def labeling(itemnum,item,label1,label2=None):
-    if itemnum==1:
+def find_item_name(item):
+    global itemKor
+    return itemKor[item]
+def label_to_board(item_num,item,label1,label2=None):
+    if item_num==1:
         for i in range(0,56):
             for j in range(0,252):
                 item[130+i][14+j]=label1[i][j]
@@ -110,10 +121,10 @@ def btctrl(event, x, y, flags, param):
    if phase==2:
        if event==cv2.EVENT_LBUTTONDOWN:
             if (x>14 and x<266) and (y>70 and y<126):
-                log(message=findko(tag1),filepath=logsrc)
+                log(message=find_item_name(tag1),filepath=LOGSRC)
                 phase=21
             elif (x>14 and x<266) and (y>130 and y<186):
-                log(message=findko(tag2),filepath=logsrc)
+                log(message=find_item_name(tag2),filepath=LOGSRC)
                 phase=22
             else:
                 btclk=switching(btclk)
@@ -140,44 +151,41 @@ if len(RTSP)>4:
         camerastate=-1
     except:
         print("Can't Find WebCamera. Use Local Camera...")
-        capture = cv2.VideoCapture(devicenum)
-        camerastate=devicenum
+        capture = cv2.VideoCapture(DEVICENUM)
+        camerastate=DEVICENUM
 else:
-    capture = cv2.VideoCapture(devicenum)
-    camerastate=devicenum
+    capture = cv2.VideoCapture(DEVICENUM)
+    camerastate=DEVICENUM
 
 ret, frame_origin = capture.read()
 width = int(capture.get(3))
 height = int(capture.get(4))
-textXX=int(imgsize[0]*textX)
-textYY=int(imgsize[1]*textY)
 frame = None
 
-cv2.namedWindow(boardName, cv2.WINDOW_NORMAL)
-cv2.setWindowProperty(boardName, cv2.WND_PROP_FULLSCREEN, 1)
-cv2.setWindowProperty(boardName, cv2.WND_PROP_TOPMOST, 1)
-cv2.resizeWindow(boardName, imgsize[0],imgsize[1])
-cv2.moveWindow(boardName, cameraX,cameraY)
-cv2.setMouseCallback(boardName,btctrl)
-###
+cv2.namedWindow(BOARD_NAME, cv2.WINDOW_NORMAL)
+cv2.setWindowProperty(BOARD_NAME, cv2.WND_PROP_FULLSCREEN, 1)
+cv2.setWindowProperty(BOARD_NAME, cv2.WND_PROP_TOPMOST, 1)
+cv2.resizeWindow(BOARD_NAME, IMGSIZE[0],IMGSIZE[1])
+cv2.moveWindow(BOARD_NAME, CAM_MOVE_X,CAM_MOVE_Y)
+cv2.setMouseCallback(BOARD_NAME,btctrl)
+
 ### camera threading
-###
 def camera():
-    cv2.namedWindow(cameraName, cv2.WINDOW_NORMAL)
-    cv2.setWindowProperty(cameraName, cv2.WND_PROP_FULLSCREEN, 1)
-    cv2.setWindowProperty(cameraName, cv2.WND_PROP_TOPMOST, 1)
-    cv2.resizeWindow(cameraName, imgsize[0],imgsize[1])
-    cv2.moveWindow(cameraName, cameraX+imgsize[0],cameraY)
+    cv2.namedWindow(CAM_NAME, cv2.WINDOW_NORMAL)
+    cv2.setWindowProperty(CAM_NAME, cv2.WND_PROP_FULLSCREEN, 1)
+    cv2.setWindowProperty(CAM_NAME, cv2.WND_PROP_TOPMOST, 1)
+    cv2.resizeWindow(CAM_NAME, IMGSIZE[0],IMGSIZE[1])
+    cv2.moveWindow(CAM_NAME, CAM_MOVE_X+IMGSIZE[0],CAM_MOVE_Y)
     global frame
     time.sleep(2)
     while phase!=-1:
-        cv2.setWindowProperty(cameraName, cv2.WND_PROP_TOPMOST, 1)
+        cv2.setWindowProperty(CAM_NAME, cv2.WND_PROP_TOPMOST, 1)
         try:
             ret, frame_origin = capture.read()
-            frame = cv2.resize(frame_origin, imgsize)
+            frame = cv2.resize(frame_origin, IMGSIZE)
             CAM_frame=frame.copy()
             cv2.putText(CAM_frame,"V4", (0, 30),cv2.FONT_HERSHEY_DUPLEX, 1, (0,0,0), 1, cv2.LINE_AA)
-            cv2.imshow(cameraName,CAM_frame)
+            cv2.imshow(CAM_NAME,CAM_frame)
             key = cv2.waitKey(1)
             if key & 0xFF == ord('q'):
                 break 
@@ -191,7 +199,7 @@ t.start()
 ###
 
 while(True):
-    cv2.setWindowProperty(boardName, cv2.WND_PROP_TOPMOST, 1)
+    cv2.setWindowProperty(BOARD_NAME, cv2.WND_PROP_TOPMOST, 1)
     if frame is not None:
         if ret != True:  # read에 실패하면 loop탈출
           break
@@ -199,15 +207,15 @@ while(True):
             Result1_IMG=frame.copy()
             Result2_IMG=frame.copy()
             if phase==1:
-                labeling(itemnum=1,item=Result1_IMG,label1=cv2.imread("./fruitlabels/"+tag1+".png",1))
-                log(message=findko(tag1),filepath=logsrc)
+                label_to_board(item_num=1,item=Result1_IMG,label1=cv2.imread("./fruitlabels/"+tag1+".png",1))
+                log(message=find_item_name(tag1),filepath=LOGSRC)
             elif phase==2:## 두개있을때
-                labeling(itemnum=2,item=Result1_IMG,label1=cv2.imread("./fruitlabels/"+tag1+".png",1), label2=cv2.imread("./fruitlabels/"+tag2+".png",1))
+                label_to_board(item_num=2,item=Result1_IMG,label1=cv2.imread("./fruitlabels/"+tag1+".png",1), label2=cv2.imread("./fruitlabels/"+tag2+".png",1))
             isWrite=True
-            cv2.imshow(boardName,Result1_IMG)
+            cv2.imshow(BOARD_NAME,Result1_IMG)
         if phase==21:
-            labeling(itemnum=1,item=Result2_IMG,label1=cv2.imread("./fruitlabels/"+tag1+".png",1))
-            cv2.imshow(boardName,Result2_IMG)
+            label_to_board(item_num=1,item=Result2_IMG,label1=cv2.imread("./fruitlabels/"+tag1+".png",1))
+            cv2.imshow(BOARD_NAME,Result2_IMG)
             res = requests.post('https://10.28.100.11:5564/infer_feedback',
                     json={  "feedback" : tag1,
                             "infer_no":infer_no,
@@ -216,8 +224,8 @@ while(True):
             print(res.json()['result'])
             phase=3
         if phase==22:
-            labeling(itemnum=1,item=Result2_IMG,label1=cv2.imread("./fruitlabels/"+tag2+".png",1))
-            cv2.imshow(boardName,Result2_IMG)
+            label_to_board(item_num=1,item=Result2_IMG,label1=cv2.imread("./fruitlabels/"+tag2+".png",1))
+            cv2.imshow(BOARD_NAME,Result2_IMG)
             res = requests.post('https://10.28.100.11:5564/infer_feedback',
                     json={  "feedback" : tag2,
                             "infer_no":infer_no,
@@ -229,10 +237,10 @@ while(True):
 
         if btclk==True:
             #화면전환
-            cv2.imshow(boardName,searching)
+            cv2.imshow(BOARD_NAME,searching)
             key = cv2.waitKey(1)
             # 초기화
-            log(message=UNDEFMSG,filepath=logsrc)
+            log(message=UNDEFMSG,filepath=LOGSRC)
             cls_list=[]
             isCapt=True
             isWrite=False
@@ -241,22 +249,21 @@ while(True):
                 h=260
                 x=150
                 w=490
-                testframe=cv2.resize(testframe[y: y + h, x: x + w],imgsize)
+                testframe=cv2.resize(testframe[y: y + h, x: x + w],IMGSIZE)
             try:
                 testframe=frame.copy()
                 encoded_byte = base64.b64encode(testframe)   
                 imgstr=encoded_byte.decode(encoding)
                 res = requests.post('https://10.28.100.11:5564/run',
                                     json={  "image" : imgstr,
-                                            "x_size":imgsize[0],
-                                            "y_size":imgsize[1],
+                                            "x_size":IMGSIZE[0],
+                                            "y_size":IMGSIZE[1],
                                             "channel":3,
                                             "key":CRUDENTIAL_KEY,
                                             "auth":"code",
                                             "ID":"None",
                                             "PW":"None",
                                             }, verify=False)
-
                 if res.json()['result']=="ok":
                     cls_list=res.json()['cls_list']
                     infer_no=res.json()['infer_no']
@@ -278,7 +285,6 @@ while(True):
             btclk=False
         if key & 0xFF == ord('q'):
             break
-
 phase=-1
 print("exit")
 capture.release()
