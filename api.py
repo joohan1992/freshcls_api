@@ -38,7 +38,7 @@ modelnum=len(ensemble_list)
 modellist=[]
 
 for path in ensemble_list:
-    modellist.append(load_model(path))
+    modellist.append(load_model(path[0]))
 
 HUDDLE1=0.8
 HUDDLE2=0.7
