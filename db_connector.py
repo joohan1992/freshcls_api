@@ -4,8 +4,7 @@ import psycopg2.extras
 
 class DbConn:
     def __init__(self):
-
-        self.db = psycopg2.connect(host='127.0.0.1', dbname='testDB', user='postgres', password='ri1234!@', port=5432)
+        self.db = psycopg2.connect(host='10.28.100.11', dbname='testDB', user='postgres', password='ri1234!@', port=5432)
         self.cursor = self.db.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
     def __del__(self):
@@ -45,7 +44,7 @@ class DbConn:
             self.cursor.execute(query)
             result = self.cursor.fetchall()
         except Exception as e:
-            result = (" select DB err", e)
+            results = []
 
         return result
 

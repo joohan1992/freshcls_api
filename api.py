@@ -19,8 +19,8 @@ import time
 
 encoding = sys.getdefaultencoding()
 
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   
-os.environ["CUDA_VISIBLE_DEVICES"]="1" 
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 
 ##########################################################################################
@@ -64,7 +64,7 @@ def sort_predict(predict):
     """
     predict의 index와 값을 tuple로 하는 list를
     내림차순으로 정렬한 값을 반환하는 함수입니다.
-    
+
     predict(list) : infer한 list
     return : [(seq , prob), ...]
     """
@@ -96,13 +96,9 @@ def initialize():
 
     query = f"SELECT label_no,item_label_eng, item_label_kor, item_cd FROM str_label where str_no={store_no}"
     dbConn = db_connector.DbConn()
-    str_label_list=dbConn.select(query=query)  
+    str_label_list=dbConn.select(query=query)
 
     return jsonify({'result': 'ok', 'str_label_list': str_label_list}) #feedback을 위해서 infer_no도 반환
-
-@app.route('/web/')
-def render_page_web():
-    return render_template('index.html')
 
 @app.route('/web/')
 def render_page_web():
@@ -152,8 +148,15 @@ def run():
     # string to bytes & write
     string_to_bytes = encoded_img.encode(encoding)
     bytes_to_numpy = base64.decodebytes(string_to_bytes)
-    data = np.frombuffer(bytes_to_numpy, dtype='uint8').reshape((y_size, x_size, img_channel))
-    cv2.imwrite(save_file_path,data)
+    if False:
+        list_bytes = []
+        bytes_to_numpy = bytes_to_numpy.split(b'[')[1].split(b']')[0].split(b', ')
+        for item in bytes_to_numpy:
+            list_bytes.append(int(item))
+        data = np.array(list_bytes, dtype=np.uint8).reshape((int(y_size), int(x_size), -1))[:, :, :3]
+    else:
+        data = np.frombuffer(bytes_to_numpy).reshape((y_size, x_size, img_channel))
+    cv2.imwrite(save_file_path, data)
     
     # insert image data into db
     query = "INSERT INTO img_data(date,time,resol_x,resol_y,file_path)"
@@ -172,13 +175,13 @@ def run():
     m4=modellist[3].predict(x,verbose = 0)[0]
     ## preprocessing 필요하면 여기서 추론
     x = preprocess_input(x)
-    m1=modellist[0].predict(x,verbose = 0)[0]   
-    m2=modellist[1].predict(x,verbose = 0)[0]   
-    m3=modellist[2].predict(x,verbose = 0)[0]  
+    m1=modellist[0].predict(x,verbose = 0)[0]
+    m2=modellist[1].predict(x,verbose = 0)[0]
+    m3=modellist[2].predict(x,verbose = 0)[0]
 
     features=m1+m2+m3+m4 # 4개의 softmax값을 다 더한것
     predicted_list=sort_predict(features) # 내림차순으로 정렬
-    max_predicted_set = { 
+    max_predicted_set = {
                         np.argmax(m1),
                         np.argmax(m2),
                         np.argmax(m3),
@@ -365,4 +368,4 @@ def test():
 if __name__ == "__main__":
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
     ssl_context.load_cert_chain(certfile='server.crt', keyfile='server.key', password='1234')
-    app.run(host='0.0.0.0', port=5564, ssl_context=ssl_context, debug=False)
+    app.run(host='0.0.0.0', port=5443, ssl_context=ssl_context, debug=True)
