@@ -116,10 +116,10 @@ def btctrl(event, x, y, flags, param):
    if phase==2:
        if event==cv2.EVENT_LBUTTONDOWN:
             if (x>14 and x<266) and (y>70 and y<126):
-                log(message=item_Kor[tag1],filepath=LOGSRC)
+                log(message=item_Kor[cls_list[0]],filepath=LOGSRC)
                 phase=21
             elif (x>14 and x<266) and (y>130 and y<186):
-                log(message=item_Kor[tag2],filepath=LOGSRC)
+                log(message=item_Kor[cls_list[1]],filepath=LOGSRC)
                 phase=22
             else:
                 btclk=switching(btclk)
@@ -201,28 +201,34 @@ while(True):
         if (isCapt==True and isWrite==False):
             Result1_IMG=frame.copy()
             Result2_IMG=frame.copy()
-            if phase==1:
-                label_to_board(item_num=1,item=Result1_IMG,label1=cv2.imread("./fruitlabels/"+tag1+".png",1))
-                log(message=item_Kor[tag1],filepath=LOGSRC)
-            elif phase==2:## 두개있을때
-                label_to_board(item_num=2,item=Result1_IMG,label1=cv2.imread("./fruitlabels/"+tag1+".png",1), label2=cv2.imread("./fruitlabels/"+tag2+".png",1))
+
+            if len(cls_list)==1:
+                phase=1
+                label_to_board(item_num=1,item=Result1_IMG,label1=cv2.imread("./fruitlabels/"+item_Eng[cls_list[0]]+".png",1))
+                log(message=item_Kor[cls_list[0]],filepath=LOGSRC)
+
+            elif len(cls_list)==2:## 두개있을때
+                phase=2
+                label_to_board(item_num=2,item=Result1_IMG,label1=cv2.imread("./fruitlabels/"+item_Eng[cls_list[0]]+".png",1), label2=cv2.imread("./fruitlabels/"+item_Eng[cls_list[1]]+".png",1))
             isWrite=True
             cv2.imshow(BOARD_NAME,Result1_IMG)
+
         if phase==21:
-            label_to_board(item_num=1,item=Result2_IMG,label1=cv2.imread("./fruitlabels/"+tag1+".png",1))
+            label_to_board(item_num=1,item=Result2_IMG,label1=cv2.imread("./fruitlabels/"+item_Eng[cls_list[0]]+".png",1))
             cv2.imshow(BOARD_NAME,Result2_IMG)
             res = requests.post(FEEDBACK_URL,
-                    json={  "feedback" : tag1,
+                    json={  "feedback" : cls_list[0],
                             "infer_no":infer_no,
                             "key":CRUDENTIAL_KEY,
                             }, verify=False)
             print(res.json()['result'])
             phase=3
+            
         if phase==22:
-            label_to_board(item_num=1,item=Result2_IMG,label1=cv2.imread("./fruitlabels/"+tag2+".png",1))
+            label_to_board(item_num=1,item=Result2_IMG,label1=cv2.imread("./fruitlabels/"+item_Eng[cls_list[1]]+".png",1))
             cv2.imshow(BOARD_NAME,Result2_IMG)
             res = requests.post(FEEDBACK_URL,
-                    json={  "feedback" : tag2,
+                    json={  "feedback" : cls_list[1],
                             "infer_no":infer_no,
                             "key":CRUDENTIAL_KEY,
                             }, verify=False)
@@ -244,11 +250,14 @@ while(True):
                 h=260
                 x=150
                 w=490
-                testframe=cv2.resize(testframe[y: y + h, x: x + w],IMGSIZE)
+                req_img=cv2.resize(req_img[y: y + h, x: x + w],IMGSIZE)
             try:
-                testframe=frame.copy()
-                encoded_byte = base64.b64encode(testframe)   
+                # 전송할 이미지 현재 frame에서 copy
+                req_img=frame.copy()
+                # img to str
+                encoded_byte = base64.b64encode(req_img)   
                 imgstr=encoded_byte.decode(encoding)
+                # request
                 res = requests.post(INFER_URL,
                                     json={  "image" : imgstr,
                                             "x_size":IMGSIZE[0],
@@ -269,16 +278,6 @@ while(True):
             except Exception as e:
                 print("ERROR : ",end="")
                 print(e)
-            if len(cls_list)==1:
-                tag1=cls_list[0]
-                phase=1
-            elif len(cls_list)==2:
-                tag1=cls_list[0]
-                tag2=cls_list[1]
-                phase=2
-            else:
-                print("Error : The server is not responding.")
-                phase=0
             btclk=False
         if key & 0xFF == ord('q'):
             break
