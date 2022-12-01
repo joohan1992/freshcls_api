@@ -12,8 +12,10 @@ import base64
 import sys
 encoding = sys.getdefaultencoding()
 
-URL = 'http://10.28.100.11:8080//run'
-URL = 'https://10.28.78.30:8889//run'
+#INFER_URL = 'http://10.28.100.11:8080//run'
+INFER_URL = 'https://10.28.78.30:8889/run'
+FEEDBACK_URL="https://10.28.78.30:8889/infer_feedback"
+INIT_URL="https://10.28.78.30:8889/initialize"
 CRUDENTIAL_KEY="7{@:M8IR;DW\\/X71uhHOd[nxa@uB%+m(/<Owq5LZ.kO%K583{t-fDb'GkE$YscX?N`X}M=WnMC<Ed}a4.$.lvDPL=q;i237fvcDjPPXmY`r.FU`@D*nQ]mBTNb#t7_Qw*Tr?f6]aTWm},Z(8L&^xI$^5Ccru'a.}'/uaN+{d\\Ox#FWv(ZT,>8vVC}kc2q2&'.qddiHnN}^*L]A*ZMT,{soMw@BrppFG[OIrv_bD/b67H:H0-;dxDID/Y[Yhz{y~VUVG|(aZ]]xj[jB*q)ARPA>)S._*JH]iE!zlnFzBatlkAfvy"
 
 print("Program Starting")
@@ -29,31 +31,25 @@ CAM_NAME="Camera"
 BOARD_NAME="Board"
 RTSP=""
 STORE_NO=0
-res = requests.post('https://10.28.100.11:5569/initialize',
-        json={"key": "testauthcode", "store_no": STORE_NO
-                }, verify=False)
+res = requests.post(INIT_URL,
+        json={  "key": CRUDENTIAL_KEY,
+                "store_no": STORE_NO, 
+                "auth" : "code"
+                }, verify=False) ## 나중에 ID 랑 PW 도 보내야됨(NONE으로)
 result=res.json()['str_label_list']
+item_Eng={}
 item_Kor={}
 for i in result:
-        item_Kor[i[1]]=i[2]
-item_Kor[UNDEFMSG]=UNDEFMSG
+    item_Eng[i[0]]=i[1]
+    item_Kor[i[0]]=i[2]    
+item_Kor[-1]=UNDEFMSG
+item_Eng[-1]=UNDEFMSG
 
 # 리스트 순회하면서 0번째 -> 1번째 (영어)
 # 리스트 순회하면서 0번째 -> 2번째 (한글)
 # 리스트 순회하면서 0번째 -> 3번째 (코드)
 ''' 예시
-[[9, 'eggplant', '가지', '880008'], [23, 'persimmon', '감', '880022'], [30, 'potato', '감자', '880029'],
-[4, 'sweetpotato', '고구마', '880003'], [15, 'pepper', '고추', '880014'], [12, 'sesame', '깻잎', '880011'],
-[14, 'paprika(yellow)', '파프리카(노랑)', '880013'], [26, 'carrot', '당근', '880025'], [39, 'green onion', '대파', '880038'],
-[43, 'lemon', '레몬', '880042'], [34, 'radish', '무', '880033'], [50, 'banana', '바나나', '880049'],
-[48, 'broccoli', '브로콜리', '880047'], [29, 'paprika(red)', '파프리카(빨강)', '880028'], [32, 'apple', '사과', '880031'],
-[42, 'shinemuscat', '샤인머스캣', '880041'], [7, 'avocado', '아보카도', '880006'], [21, 'babypumpkin', '애호박', '880020'],
-[18, 'cabbage', '양배추', '880017'], [24, 'gganonion', '깐양파', '880023'], [40, 'angganonion', '안깐양파', '880039'],
-[22, 'orange', '오렌지', '880021'], [13, 'cucumber', '오이', '880012'], [38, 'grape', '포도', '880037'],
-[27, 'garibi', '가리비', '880026'], [47, 'gosari', '고사리', '880046'], [36, 'gosu', '고수', '880035'],
-[51, 'mushroom', '느타리버섯', '880050'], [46, 'daechu', '대추', '880045'], [44, 'strawberry', '딸기', '880043'],
-[25, 'garlic', '마늘', '880024'], [1, 'pear', '배', '880000'], [45, 'koreancabbage', '배추', '880044'], [37, 'peach', '복숭아', '880036'], 
-[5, 'sangchu', '상추', '880004'], [10, 'sora', '소라', '880009'], [31, 'watermelon', '수박', '880030']
+[[9, 'eggplant', '가지', '880008'], ....]]
 '''
 ###
 searching=cv2.imread(LOADIMGSRC,1)
@@ -75,8 +71,12 @@ for line in sp_lines:
         DEVICENUM = int(token[1])
     elif title == 'RTSP':
         RTSP = str(token[1])
-    elif title == 'URL':
-        URL = str(token[1])
+    elif title == 'INFER_URL':
+        INFER_URL = str(token[1])
+    elif title == 'FEEDBACK_URL':
+        FEEDBACK_URL = str(token[1])
+    elif title == 'INIT_URL':
+        INIT_URL = str(token[1])
     elif title == 'CAM_MOVE_X':
         CAM_MOVE_X = str(token[1])
     elif title == 'CAM_MOVE_Y':
@@ -99,9 +99,7 @@ for line in sp_lines:
 
 print("Function Loading")
 
-def find_item_name(item):
-    global itemKor
-    return itemKor[item]
+
 def label_to_board(item_num,item,label1,label2=None):
     if item_num==1:
         for i in range(0,56):
@@ -121,10 +119,10 @@ def btctrl(event, x, y, flags, param):
    if phase==2:
        if event==cv2.EVENT_LBUTTONDOWN:
             if (x>14 and x<266) and (y>70 and y<126):
-                log(message=find_item_name(tag1),filepath=LOGSRC)
+                log(message=item_Kor[cls_list[0]],filepath=LOGSRC)
                 phase=21
             elif (x>14 and x<266) and (y>130 and y<186):
-                log(message=find_item_name(tag2),filepath=LOGSRC)
+                log(message=item_Kor[cls_list[1]],filepath=LOGSRC)
                 phase=22
             else:
                 btclk=switching(btclk)
@@ -206,30 +204,38 @@ while(True):
         if (isCapt==True and isWrite==False):
             Result1_IMG=frame.copy()
             Result2_IMG=frame.copy()
-            if phase==1:
-                label_to_board(item_num=1,item=Result1_IMG,label1=cv2.imread("./fruitlabels/"+tag1+".png",1))
-                log(message=find_item_name(tag1),filepath=LOGSRC)
-            elif phase==2:## 두개있을때
-                label_to_board(item_num=2,item=Result1_IMG,label1=cv2.imread("./fruitlabels/"+tag1+".png",1), label2=cv2.imread("./fruitlabels/"+tag2+".png",1))
+
+            if len(cls_list)==1:
+                phase=1
+                label_to_board(item_num=1,item=Result1_IMG,label1=cv2.imread("./fruitlabels/"+item_Eng[cls_list[0]]+".png",1))
+                log(message=item_Kor[cls_list[0]],filepath=LOGSRC)
+
+            elif len(cls_list)==2:## 두개있을때
+                phase=2
+                label_to_board(item_num=2,item=Result1_IMG,label1=cv2.imread("./fruitlabels/"+item_Eng[cls_list[0]]+".png",1), label2=cv2.imread("./fruitlabels/"+item_Eng[cls_list[1]]+".png",1))
             isWrite=True
             cv2.imshow(BOARD_NAME,Result1_IMG)
+
         if phase==21:
-            label_to_board(item_num=1,item=Result2_IMG,label1=cv2.imread("./fruitlabels/"+tag1+".png",1))
+            label_to_board(item_num=1,item=Result2_IMG,label1=cv2.imread("./fruitlabels/"+item_Eng[cls_list[0]]+".png",1))
             cv2.imshow(BOARD_NAME,Result2_IMG)
-            res = requests.post('https://10.28.100.11:5564/infer_feedback',
-                    json={  "feedback" : tag1,
+            res = requests.post(FEEDBACK_URL,
+                    json={  "feedback" : cls_list[0],
                             "infer_no":infer_no,
                             "key":CRUDENTIAL_KEY,
+                            "auth" : "code"
                             }, verify=False)
             print(res.json()['result'])
             phase=3
+
         if phase==22:
-            label_to_board(item_num=1,item=Result2_IMG,label1=cv2.imread("./fruitlabels/"+tag2+".png",1))
+            label_to_board(item_num=1,item=Result2_IMG,label1=cv2.imread("./fruitlabels/"+item_Eng[cls_list[1]]+".png",1))
             cv2.imshow(BOARD_NAME,Result2_IMG)
-            res = requests.post('https://10.28.100.11:5564/infer_feedback',
-                    json={  "feedback" : tag2,
+            res = requests.post(FEEDBACK_URL,
+                    json={  "feedback" : cls_list[1],
                             "infer_no":infer_no,
                             "key":CRUDENTIAL_KEY,
+                            "auth" : "code"
                             }, verify=False)
             print(res.json()['result'])
             phase=3
@@ -249,39 +255,34 @@ while(True):
                 h=260
                 x=150
                 w=490
-                testframe=cv2.resize(testframe[y: y + h, x: x + w],IMGSIZE)
+                req_img=cv2.resize(req_img[y: y + h, x: x + w],IMGSIZE)
             try:
-                testframe=frame.copy()
-                encoded_byte = base64.b64encode(testframe)   
+                # 전송할 이미지 현재 frame에서 copy
+                req_img=frame.copy()
+                # img to str
+                encoded_byte = base64.b64encode(req_img)   
                 imgstr=encoded_byte.decode(encoding)
-                res = requests.post('https://10.28.100.11:5564/run',
+                # request
+                res = requests.post(INFER_URL,
                                     json={  "image" : imgstr,
                                             "x_size":IMGSIZE[0],
                                             "y_size":IMGSIZE[1],
                                             "channel":3,
                                             "key":CRUDENTIAL_KEY,
+                                            "store_no":0,
                                             "auth":"code",
                                             "ID":"None",
-                                            "PW":"None",
+                                            "PW":"None"
                                             }, verify=False)
                 if res.json()['result']=="ok":
                     cls_list=res.json()['cls_list']
                     infer_no=res.json()['infer_no']
+                    print("Server POST : "+res.json()['result'])
                 else:
                     print("Server POST : "+res.json()['result'])
             except Exception as e:
                 print("ERROR : ",end="")
                 print(e)
-            if len(cls_list)==1:
-                tag1=cls_list[0]
-                phase=1
-            elif len(cls_list)==2:
-                tag1=cls_list[0]
-                tag2=cls_list[1]
-                phase=2
-            else:
-                print("Error : The server is not responding.")
-                phase=0
             btclk=False
         if key & 0xFF == ord('q'):
             break
