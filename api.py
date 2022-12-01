@@ -210,13 +210,13 @@ def run():
 
     if predicted_list[0][0] in undeflist: ##1순위가 undef thing일때 (얘는 undefthing label number를 반환)
         seq=predicted_list[0][0]
-        query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
+        query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
         result=dbConn.execute(query=query)[0][0]         
         cls_list.append(result)
         phase=1
     elif predicted_list[0][1]>HUDDLE1*modelnum: ##1개만 출력
         seq=predicted_list[0][0]
-        query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
+        query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
         result=dbConn.execute(query=query)[0][0]
         cls_list.append(result)
         phase=1
@@ -228,14 +228,14 @@ def run():
         phase=0
     elif (predicted_list[0][1]+predicted_list[1][1]) > HUDDLE2*modelnum :##2개합쳐서 huddle2*4넘을때도하자
         seq=predicted_list[0][0]
-        query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
+        query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
         result=dbConn.execute(query=query)[0][0]
         cls_list.append(result)
         if predicted_list[1][0] in undeflist: # 2순위가 undef일때
             phase=1
         else:
             seq=predicted_list[1][0]
-            query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
+            query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
             result=dbConn.execute(query=query)[0][0]
             cls_list.append(result)
             phase=2
@@ -268,10 +268,10 @@ def run():
     ## 앙상블 모델별 추론결과 저장
     sort_m1=sort_predict(m1)
     seq=sort_m1[0][0]
-    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
+    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
     m1_result1=dbConn.execute(query=query)[0][0]
     seq=sort_m1[1][0]
-    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
+    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
     m1_result2=dbConn.execute(query=query)[0][0]
     # prob 1,2 (점수)
     m1_prob1=sort_m1[0][1]
@@ -282,10 +282,10 @@ def run():
 
     sort_m2=sort_predict(m2)
     seq=sort_m2[0][0]
-    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
+    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
     m2_result1=dbConn.execute(query=query)[0][0]
     seq=sort_m2[1][0]
-    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
+    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
     m2_result2=dbConn.execute(query=query)[0][0]
     # prob 1,2 (점수)
     m2_prob1=sort_m2[0][1]
@@ -296,10 +296,10 @@ def run():
 
     sort_m3=sort_predict(m3)
     seq=sort_m3[0][0]
-    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
+    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
     m3_result1=dbConn.execute(query=query)[0][0]
     seq=sort_m3[1][0]
-    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
+    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
     m3_result2=dbConn.execute(query=query)[0][0]
     # prob 1,2 (점수)
     m3_prob1=sort_m3[0][1]
@@ -310,10 +310,10 @@ def run():
 
     sort_m4=sort_predict(m4)
     seq=sort_m4[0][0]
-    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
+    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
     m4_result1=dbConn.execute(query=query)[0][0]
     seq=sort_m4[1][0]
-    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq}"
+    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
     m4_result2=dbConn.execute(query=query)[0][0]
     # prob 1,2 (점수)
     m4_prob1=sort_m4[0][1]
