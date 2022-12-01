@@ -218,6 +218,7 @@ def run():
     userPW      = res['PW']
     auth_key    = res['key']
     str_no      = res['store_no']
+    send_device      = res['send_device']
     auth        = res['auth'] # code or id
     if auth == "code":
         isauth=authorize(auth_key)
@@ -237,7 +238,7 @@ def run():
     # string to bytes & write
     string_to_bytes = encoded_img.encode(encoding)
     bytes_to_numpy = base64.decodebytes(string_to_bytes)
-    if False:
+    if send_device=="android" or send_device=="web":
         list_bytes = []
         bytes_to_numpy = bytes_to_numpy.split(b'[')[1].split(b']')[0].split(b', ')
         for item in bytes_to_numpy:
