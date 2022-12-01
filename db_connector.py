@@ -40,6 +40,7 @@ class DbConn:
         self.insert(query, 'delete')
 
     def select(self, query):
+        result = None
         try:
             self.cursor.execute(query)
             result = self.cursor.fetchall()
