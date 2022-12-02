@@ -6,48 +6,11 @@ import db_connector
 import ssl
 
 
-from keras.models import load_model
-from keras.applications.inception_v3 import preprocess_input
-from keras.preprocessing import image
-import os
-from datetime import datetime
 
-import sys
 import base64
 import time
 
-
-encoding = sys.getdefaultencoding()
-
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
-
-
-##########################################################################################
-############################## 나중에 DB에서 가져와야 될 부분###############################
-##########################################################################################
-
-query = "SELECT model_no FROM model where model_nm='ensemble'"
-dbConn = db_connector.DbConn()
-model_no=dbConn.select(query=query)[0][0]
-
-query = f'SELECT model_path FROM ensemble_model where model_no={model_no}'
-ensemble_list=dbConn.select(query=query)
-del(dbConn)
-modelnum=len(ensemble_list)
-modellist=[]
-model_pre=[]
-for path in ensemble_list:
-    modellist.append(load_model(path[0]))
-    if path[0] in "effi":
-        model_pre.append(1)
-    else:
-        model_pre.append(0)
-HUDDLE1=0.8
-HUDDLE2=0.7
-
-##########################################################################################
-##########################################################################################
+import Infer as inf
 
 def authorize(auth_key):
     query = f"SELECT * FROM auth where auth_cd = '{auth_key}' and act_yn='Y'"
@@ -56,35 +19,12 @@ def authorize(auth_key):
     del(dbConn)
     return False if len(result)==0 else True
 
-
-def now():
-    now = datetime.now()
-    string = str(now).replace(":", "-")
-    return string[0:10]+"_"+string[11:22]
-def current_milli_time():
-    return round(time.time() * 1000)
-def sort_predict(predict):
-    """
-    predict의 index와 값을 tuple로 하는 list를
-    내림차순으로 정렬한 값을 반환하는 함수입니다.
-
-    predict(list) : infer한 list
-    return : [(seq , prob), ...]
-    """
-    predict_dict={}
-    for i in range(len(predict)):
-        predict_dict[i]=predict[i]
-    predict_dict=(sorted(predict_dict.items(), key=lambda x: x[1], reverse=True))
-    return predict_dict
-
-
 app = Flask(__name__, template_folder='web')
 CORS(app, support_credentials=True)
 
 FLUTTER_WEB_APP = 'web'
 
 def initialize(str_no):
-
     # 전달받은 str_no로 사용하고 있는 model_no 찾기
     query = f"SELECT model_no, act_yn from model where str_no={str_no} and use_yn= 'Y'"
     dbConn = db_connector.DbConn()
@@ -97,7 +37,6 @@ def initialize(str_no):
 
     query = "SELECT model_label.label_no, item_label.label_nm_eng, item_label.label_nm_kor, item_cd FROM" # 라벨 / 영어 / 한글 / 아이템코드 전달(해당모델)
     query+= f" model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no where model_label.model_no={model_no}" #modelnum
-
     str_label_list=dbConn.select(query=query)
     str_label_list.append([-1, 'Undefined', 'Undefined','None'])
     del(dbConn)
@@ -123,12 +62,9 @@ def return_flutter_doc(name):
 @app.route('/client_init', methods=['POST'])
 def client_init():
     '''
-    input
-    'key'
-    'str_no'
-    output
-    result : 'ok' / 'fail'
-    str_label_list : list
+    input   :   'key'   /   'str_no'
+    output  :   result : 'ok' / 'fail'
+                str_label_list : list
     '''
     res=request.get_json()
     auth_key    = res['key']
@@ -179,8 +115,14 @@ def login():
         act_yn = 'Y' / 'N'
         login_no = 해당 로그인 정보
         str_no = 매장 정보
-        log_in_st = 0 : 로그인 성공 + 인증 Y, 1 : 로그인 성공 + 인증 N, 2 : ID 오류, 3 : PW 오류(ID는 맞으나 PW 틀림)
-        log_in_text = 0 : '로그인 및 인증을 모두 성공했습니다.' , 1 : '인증이 되지 않은 로그인 정보입니다.', 2 : 'ID가 틀렸습니다.', 3 : 'PW가 틀렸습니다.' 
+        log_in_st    =  0 : 로그인 성공 + 인증 Y, 
+                        1 : 로그인 성공 + 인증 N, 
+                        2 : ID 오류, 
+                        3 : PW 오류(ID는 맞으나 PW 틀림)
+        log_in_text =   0 : '로그인 및 인증을 모두 성공했습니다.' ,
+                        1 : '인증이 되지 않은 로그인 정보입니다.',
+                        2 : 'ID가 틀렸습니다.', 
+                        3 : 'PW가 틀렸습니다.' 
     '''
     dict_result = {}
     dict_text = {   0 : '로그인 및 인증을 모두 성공했습니다.',
@@ -204,14 +146,13 @@ def login():
             log_in_st = 1
         else:
             log_in_st = 3
-        
         dict_result['str_no'] = login_dict['str_no']
         dict_result['act_yn'] = login_dict['act_yn']
-        dict_result['login_no'] = login_dict['login_no'] ## 아이디가 있을때만 request로 보냄
+        dict_result['login_no'] = login_dict['login_no'] # 아이디가 있을때만 return
     else:
         log_in_st = 2
 
-    # result가 ok면 
+    # isIdExist랑 상관없이 무조건 return하는것
     dict_result['log_in_st'] = log_in_st
     dict_result['log_in_text'] = dict_text[log_in_st]
     
