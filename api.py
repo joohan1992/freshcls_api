@@ -218,7 +218,7 @@ def run():
     userPW      = res['PW']
     auth_key    = res['key']
     str_no      = res['store_no']
-    send_device      = res['send_device']
+    send_device = res['send_device']
     auth        = res['auth'] # code or id
     if auth == "code":
         isauth=authorize(auth_key)
@@ -396,11 +396,6 @@ def run():
     query = "INSERT INTO ensemble_infer_history(infer_no, image_no, result1, result2, result1_prob, result2_prob,ensemble_model_no)"
     query += f" VALUES({infer_no} ,{img_no},{m4_result1},{m4_result2},{m4_prob1},{m4_prob2},{4} ) "
     dbConn.insert(query=query)
-
-    print(sort_m1)
-    print(sort_m2)
-    print(sort_m3)
-    print(sort_m4)
 
     del(dbConn)
     return jsonify({'result': 'ok', 'cls_list': cls_list, 'infer_no' :infer_no }) #feedback을 위해서 infer_no도 반환
