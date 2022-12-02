@@ -15,7 +15,7 @@ encoding = sys.getdefaultencoding()
 #INFER_URL = 'http://10.28.100.11:8080//run'
 INFER_URL = 'https://10.28.78.30:8889/run'
 FEEDBACK_URL="https://10.28.78.30:8889/infer_feedback"
-INIT_URL="https://10.28.78.30:8889/initialize"
+INIT_URL="https://10.28.78.30:8889/client_init"
 CRUDENTIAL_KEY="7{@:M8IR;DW\\/X71uhHOd[nxa@uB%+m(/<Owq5LZ.kO%K583{t-fDb'GkE$YscX?N`X}M=WnMC<Ed}a4.$.lvDPL=q;i237fvcDjPPXmY`r.FU`@D*nQ]mBTNb#t7_Qw*Tr?f6]aTWm},Z(8L&^xI$^5Ccru'a.}'/uaN+{d\\Ox#FWv(ZT,>8vVC}kc2q2&'.qddiHnN}^*L]A*ZMT,{soMw@BrppFG[OIrv_bD/b67H:H0-;dxDID/Y[Yhz{y~VUVG|(aZ]]xj[jB*q)ARPA>)S._*JH]iE!zlnFzBatlkAfvy"
 
 print("Program Starting")
