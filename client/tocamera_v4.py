@@ -30,11 +30,10 @@ DEVICENUM=0
 CAM_NAME="Camera"
 BOARD_NAME="Board"
 RTSP=""
-STORE_NO=0
+STR_NO=0
 res = requests.post(INIT_URL,
         json={  "key": CRUDENTIAL_KEY,
-                "store_no": STORE_NO, 
-                "auth" : "code"
+                "str_no": STR_NO
                 }, verify=False) ## 나중에 ID 랑 PW 도 보내야됨(NONE으로)
 result=res.json()['str_label_list']
 item_Eng={}
@@ -269,7 +268,7 @@ while(True):
                                             "y_size":IMGSIZE[1],
                                             "channel":3,
                                             "key":CRUDENTIAL_KEY,
-                                            "store_no":0,
+                                            "str_no":0,
                                             "auth":"code",
                                             "ID":"None",
                                             "PW":"None"

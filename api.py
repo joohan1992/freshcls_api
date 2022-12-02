@@ -83,28 +83,17 @@ CORS(app, support_credentials=True)
 
 FLUTTER_WEB_APP = 'web'
 
-@app.route('/initialize', methods=['POST'])
-def initialize():
-    res=request.get_json()
-    auth_key = res['key']
-    store_no = res['store_no']
-    auth =     res['auth'] # code or id (나중에 ID랑 PW도 받아야됨)
-    if auth=="code":
-        isauth=authorize(auth_key)
-    #elif auth=="id"
-    #   id/pw 매칭
-    if isauth==False: ## 인증키 없으면
-        return jsonify({'result': 'Fail'})
+def initialize(str_no):
 
-    # 전달받은 store_no로 사용하고 있는 model_no 찾기
-    query = f"SELECT model_no, act_yn from model where str_no={store_no} and use_yn= 'Y'"
+    # 전달받은 str_no로 사용하고 있는 model_no 찾기
+    query = f"SELECT model_no, act_yn from model where str_no={str_no} and use_yn= 'Y'"
     dbConn = db_connector.DbConn()
 
     model_no = dbConn.select(query=query)[0][0]   ##model_no
     model_state= dbConn.select(query=query)[0][1] ##act_yn
 
     if model_state == "N":
-        return jsonify({'result': 'Fail'})
+        return "fail"
 
     query = "SELECT model_label.label_no, item_label.label_nm_eng, item_label.label_nm_kor, item_cd FROM" # 라벨 / 영어 / 한글 / 아이템코드 전달(해당모델)
     query+= f" model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no where model_label.model_no={model_no}" #modelnum
@@ -113,7 +102,7 @@ def initialize():
     str_label_list.append([-1, 'Undefined', 'Undefined','None'])
     del(dbConn)
 
-    return jsonify({'result': 'ok', 'str_label_list': str_label_list}) #feedback을 위해서 infer_no도 반환
+    return str_label_list #feedback을 위해서 infer_no도 반환
 
 @app.route('/web/')
 def render_page_web():
@@ -131,38 +120,62 @@ def return_flutter_doc(name):
 
     return send_from_directory(DIR_NAME, datalist[-1])
 
+@app.route('/client_init', methods=['POST'])
+def client_init():
+    '''
+    input
+    'key'
+    'str_no'
+    output
+    result : 'ok' / 'fail'
+    str_label_list : list
+    '''
+    res=request.get_json()
+    auth_key    = res['key']
+    str_no      = res['str_no']
+    isauth=authorize(auth_key)
+
+    if isauth==False:
+        return jsonify({'result' : 'fail'})
+    # DB에서 api 형태로 query 정보를 받아오는 코드
+    else:
+        str_label_list = initialize(str_no)
+
+    return jsonify({'result' : 'ok', 'str_label_list':str_label_list})
+
+
 @app.route('/login', methods=['POST'])
 def login():
 
+    res=request.get_json()
     # Flutter에서 해당 url로 email과 password를 post한 내용을 받아오는 코드
-
         # request 방식 확인 코드
-
-    id = str(request.form.get('id'))
-    pwd = request.form.get('password')
-    params = [id, pwd]
+    userID = str(res['id'])
+    userPW = str(res['password'])
+    params = [userID, userPW]
     print(params)
     param_dict = dict(zip(['id', 'password'], params))
 
     # DB에서 api 형태로 query 정보를 받아오는 코드
 
-    query = f"SELECT * FROM login WHERE id = '{id}';"
+    query = f"SELECT * FROM login WHERE id = '{userID}';"
     dbConn = db_connector.DbConn()
+
+    ##아이디가 있나없나 보는거
     login_data = dbConn.select(query=query)
     login_dict = None
     if len(login_data) > 0:
         login_dict = dict(zip(['id', 'password', 'login_no', 'act_yn', 'str_no'],login_data[0]))
         print(login_dict)
-        id_s = 1
+        isIdExist = True
     else:
-        id_s = 0
-
+        isIdExist = False
 
     # Flutter에서 받아온 정보를 DB에서 받아온 정보와 비교하여 POST할 dict를 작성하는 코드
-
     # flutter에 전송할 dictionary
     # 형태는 {act_yn, login_no, str_no, log_in_state, log_in_text}
     '''
+        result = 'ok' / 'fail'
         act_yn = 'Y' / 'N'
         login_no = 해당 로그인 정보
         str_no = 매장 정보
@@ -170,39 +183,45 @@ def login():
         log_in_text = 0 : '로그인 및 인증을 모두 성공했습니다.' , 1 : '인증이 되지 않은 로그인 정보입니다.', 2 : 'ID가 틀렸습니다.', 3 : 'PW가 틀렸습니다.' 
     '''
     dict_result = {}
-    dict_text = {0 : '로그인 및 인증을 모두 성공했습니다.', 1 : '인증이 되지 않은 로그인 정보입니다.', 2 : 'ID가 틀렸습니다.', 3 : 'PW가 틀렸습니다.', 4 : '인증 오류 발생'}
+    dict_text = {   0 : '로그인 및 인증을 모두 성공했습니다.',
+                    1 : '인증이 되지 않은 로그인 정보입니다.',
+                    2 : 'ID가 틀렸습니다.', 
+                    3 : 'PW가 틀렸습니다.',
+                    4 : '인증 오류 발생'    }
+    
+    # 초기화
     log_in_st = 4
+    dict_result['log_in_st'] = log_in_st 
+    dict_result['result'] = 'fail'
 
-    if id_s == 1:
-        dict_result['log_in_st'] = log_in_st
-        dict_result['str_no'] = login_dict['str_no']
-        dict_result['login_no'] = login_dict['login_no']
-        if login_dict['password'] == param_dict['password']:
-            if login_dict['act_yn'] == 'Y':
-                dict_result['act_yn'] = login_dict['act_yn']
-                log_in_st = 0
-                dict_result['log_in_st'] = log_in_st
-
-            else:
-                dict_result['act_yn'] = login_dict['act_yn']
-                log_in_st = 1
-                dict_result['log_in_st'] = log_in_st
-
+    ## 5개 다 받아오긴함 패스워드랑 act까지 통과하면 ok
+    if isIdExist: 
+        if login_dict['password'] == param_dict['password'] and login_dict['act_yn'] == 'Y':
+            log_in_st = 0
+            dict_result['result'] = 'ok'
+            query = f"SELECT * FROM login WHERE id = '{userID}';"
+        elif login_dict['password'] == param_dict['password'] and login_dict['act_yn'] == 'N':
+            log_in_st = 1
         else:
             log_in_st = 3
-            dict_result['log_in_st'] = log_in_st
-
+        
+        dict_result['str_no'] = login_dict['str_no']
+        dict_result['act_yn'] = login_dict['act_yn']
+        dict_result['login_no'] = login_dict['login_no'] ## 아이디가 있을때만 request로 보냄
     else:
         log_in_st = 2
-        dict_result['log_in_st'] = log_in_st
 
+    # result가 ok면 
+    dict_result['log_in_st'] = log_in_st
     dict_result['log_in_text'] = dict_text[log_in_st]
-
+    
+    if dict_result['result'] == 'ok':
+        dict_result['label_init']=initialize(dict_result['str_no'])
     print(dict_result)
 
     # 비교 후 작성된 dict 내용을 json 혹은 ajax 형태로 flutter에 전송하기 위한 코드
-
     # res = requests.post("https://192.168.0.108:2092/login", data = json.dumps(dict_result), verify = False)
+    del(dbConn)
     return jsonify(dict_result)
 
 @app.route('/run', methods=['POST'])
@@ -217,7 +236,7 @@ def run():
     userID      = res['ID']
     userPW      = res['PW']
     auth_key    = res['key']
-    str_no      = res['store_no']
+    str_no      = res['str_no']
     send_device = res['send_device']
     auth        = res['auth'] # code or id
     if auth == "code":
@@ -225,7 +244,7 @@ def run():
     #elif auth=="id"
     #   id/pw 매칭
     if isauth == False: ## 인증키 없으면
-        return jsonify({'result': 'Fail'})
+        return jsonify({'result': 'fail'})
 
     # 파일명 생성 및 이미지 저장
     filename=now()+'.jpg'
@@ -410,7 +429,7 @@ def infer_feedback():
     #elif auth=="id"
     #   id/pw 매칭
     if isauth==False: ## 인증키 없으면
-        return jsonify({'result': 'Fail'})
+        return jsonify({'result': 'fail'})
     feedback=res['feedback'] # client랑 소통하는건 label_no으로만
     infer_no=res['infer_no']
 
