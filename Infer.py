@@ -191,6 +191,8 @@ class model():
 
 class machine():
     def __init__(self,info,gpu) -> None:
+        os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+        os.environ["CUDA_VISIBLE_DEVICES"]='"'+str(gpu)+'"'
         self.model_no           = info[0]
         self.path               = info[1]
         self.preprocess         = info[2]
@@ -198,17 +200,19 @@ class machine():
         self.isload=False
         self.load()
         self.info()
-        os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-        os.environ["CUDA_VISIBLE_DEVICES"]=str(gpu)
     def info(self):
-        print(f"machine {self.ensemble_model_no} init")
+        if self.isload:
+            print(f"machine {self.ensemble_model_no} init")
+        else:
+            print(f"machine {self.ensemble_model_no} cannot load file.")
     def load(self):
         try:
             self.model  = load_model(self.path)
             self.isload = True
-        except:
+        except Exception as e:
             self.model  = None
             self.isload = False
+            print(e)
     def preprocessing(self,data):
         ## img resize / x,y size가 다르면 error 캐치하기 나중에추가
         data_resize=cv2.resize(data,(299,299))

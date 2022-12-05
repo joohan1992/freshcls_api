@@ -192,27 +192,17 @@ def run():
     isauth=authorize(res['key'])
     if isauth == False: ## 인증키 없으면
         return jsonify({'result': 'fail'})
-
     if res['ID']=='None':
         model=model_load_dict[res['key']]
     else :
         model=model_load_dict[res['ID']]
-
     model.info()
     model.setImageInfo(res)
     model.saveImg()
     model.runMachine()
     cls_list=model.clsLogic()
-    
-    # run 전에 init하고 아이디(or 인증키) : 모델 로 딕셔너리해서
-    # key로 추론
-    
     timecheck=inf.current_milli_time()-timecheck
     model.log(timecheck)
-
-
-
-    ## 앙상블 모델별 추론결과 저장
 
     return jsonify({'result': 'ok', 'cls_list': cls_list, 'infer_no' :model.infer_no }) #feedback을 위해서 infer_no도 반환
 
