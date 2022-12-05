@@ -37,31 +37,33 @@ def authorize(auth_key):
     return False if len(result)==0 else True
 
 encoding = sys.getdefaultencoding()
-
-class machine():
-    def __init__(self,info,gpu) -> None:
-        self.model_no           = info[0]
-        self.path               = info[1]
-        self.preprocess         = info[2]
-        self.ensemble_model_no  = info[3]
-        self.isload=False
-        self.load(self)
-        os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-        os.environ["CUDA_VISIBLE_DEVICES"]=str(gpu)
+class model():
+    def __init__(self,model_no,gpu) -> None: ## 이건 클라킬때 한번 해야됨.
+        dbConn = db_connector.DbConn()
+        self.model_no=model_no
+        query = "SELECT ensemble_model.model_no, ensemble_model.model_path, ensemble_model.preprocess, ensemble_model.ensemble_model_no "
+        query+= f"FROM ensemble_model LEFT JOIN model ON (model.model_no = ensemble_model.model_no) WHERE model.model_no={model_no}"
+        self.ensemble_list=dbConn.select(query=query)
+        self.modellist=[]
+        for info in self.ensemble_list:
+            self.modellist.append(machine(info,gpu=str(gpu))) # 뒤에숫자 gpu
+        query =  "SELECT model_label.label_seq FROM model_label LEFT JOIN item_label "
+        query += "ON model_label.label_no = item_label.label_no "
+        query += f"WHERE item_label.valid_yn = 'N' and model_label.model_no = {model_no}"
+        self.undeflist = [data for inner_list in dbConn.select(query=query) for data in inner_list]
+        self.HUDDLE1=0.8
+        self.HUDDLE2=0.7
+        self.cls_list = []
+        del(dbConn)
+    def setHuddle(self,huddle1,huddle2):
+        self.HUDDLE1=huddle1
+        self.HUDDLE2=huddle2
     def info(self):
-        pass
-    def load(self):
-        try:
-            self.model  = load_model(self.path)
-            self.isload = True
-        except:
-            self.model  = None
-            self.isload = False
+        print("Model Num : "+str(self.model_no))
     def setImageInfo(self,res):
         self.encoded_img = res['image']
         self.x_size      = res['x_size']
         self.y_size      = res['y_size']
-        self.img_channel = res['channel']
         self.userID      = res['ID']
         self.userPW      = res['PW']
         self.auth_key    = res['key']
@@ -97,80 +99,15 @@ class machine():
         dbConn.insert(query=query)
 
         self.img_no=dbConn.lastpick() # pick image no
+
         del(dbConn)
-    def preprocessing(self):
-        ## img resize / x,y size가 다르면 error 캐치하기 나중에추가
-        data_resize=cv2.resize(self.data,(299,299))
-        predict_img = cv2.cvtColor(data_resize,cv2.COLOR_BGR2RGB)
-        self.x = image.image_utils.img_to_array(predict_img)
-        self.x = np.expand_dims(self.x, axis = 0)     ## efficientnet일 경우 preprocessing 필요 x
-        if self.preprocess=='Y':
-            self.x = preprocess_input(self.x)
-    def run(self, res):
-        self.setImageInfo(res)
-        self.saveImg()
-        self.preprocessing()
-        if self.isload:
-            self.softmax = self.model.predict(self.x,verbose = 0)[0]
-        else:
-            self.load()
-            self.softmax = self.model.predict(self.x,verbose = 0)[0]
-        self.predict=sort_predict(self.softmax) # 내림차순으로 정렬
-        self.log()
-    def log(self):
 
-        dbConn = db_connector.DbConn()
-
-        seq=self.predict[0][0]
-        label=self.seqToLabel(seq)
-        query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
-        m1_result1=dbConn.execute(query=query)[0][0]
-        seq=sort_m1[1][0]
-        query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
-        m1_result2=dbConn.execute(query=query)[0][0]
-        # prob 1,2 (점수)
-        m1_prob1=sort_m1[0][1]
-        m1_prob2=sort_m1[1][1]
-        query = "INSERT INTO ensemble_infer_history(infer_no, image_no, result1, result2, result1_prob, result2_prob,ensemble_model_no)"
-        query += f" VALUES({infer_no} ,{img_no},{m1_result1},{m1_result2},{m1_prob1},{m1_prob2},{1} ) "
-        dbConn.insert(query=query)
-
-        ######여기부터하면됩니다.
-
-    def seqToLabel(self,seq):
-        dbConn = db_connector.DbConn()
-        query = "SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no "
-        query = f"WHERE label_seq= {seq} and model_no = {self.model_no}"
-        result = dbConn.execute(query=query)[0][0]
-        del(dbConn)
-        return result
-
-class model():
-    def __init__(self,model_no,gpu) -> None: ## 이건 클라킬때 한번 해야됨.
-        dbConn = db_connector.DbConn()
-        self.model_no=model_no
-        query = "SELECT ensemble_model.model_no, ensemble_model.model_path, ensemble_model.preprocess, ensemble_model.ensemble_model_no "
-        query+= f"FROM ensemble_model LEFT JOIN model ON (model.model_no = ensemble_model.model_no) WHERE model.model_no={model_no}"
-        self.ensemble_list=dbConn.select(query=query)
-        self.modellist=[]
-        for info in self.ensemble_list:
-            self.modellist.append(machine(info,gpu=str(gpu))) # 뒤에숫자 gpu
-        query =  "SELECT model_label.label_seq FROM model_label LEFT JOIN item_label "
-        query += "ON model_label.label_no = item_label.label_no "
-        query += f"WHERE item_label.valid_yn = 'N' and item_label.model_no = {model_no}"
-        self.undeflist = [data for inner_list in dbConn.select(query=query) for data in inner_list]
-        self.HUDDLE1=0.8
-        self.HUDDLE2=0.7
-        self.cls_list = []
-        del(dbConn)
-    def info(self):
-        print("Number of Loaded Model : "+str(len(self.modellist)))
-    def setHuddle(self,huddle1,huddle2):
-        self.HUDDLE1=huddle1
-        self.HUDDLE2=huddle2
-    def runMachine(self,res):
+    def runMachine(self):
         for i in self.modellist:
-            i.run(res)
+            i.run(self.data)
+        self.max_predicted_set()
+        self.clsLogic()
+
     def max_predicted_set(self):
         self.predicted_set = set()
         self.maximumSoftmax=-1
@@ -189,14 +126,16 @@ class model():
         #각 모델들의 1순위들 index (seq)
     #0개 / 1개 / 2개 잖아.
     def clsLogic(self):
+        self.cls_list=[]
+        phase=-1
         if self.predicted_list[0][0] in self.undeflist: ##1순위가 undef thing일때 (얘는 undefthing label number를 반환)
-            self.phase=1
+            phase=1
         elif self.predicted_list[0][1]>self.HUDDLE1*len(self.modellist): ##1개만 출력
-            self.phase=1
+            phase=1
         elif len(self.predicted_set)==len(self.modellist): #undef출력 : -1
-            self.phase=0
+            phase=0
         elif self.maximumSoftmax < self.HUDDLE2: #undef출력 : -1
-            self.phase=0
+            phase=0
         elif (self.predicted_list[0][1]+self.predicted_list[1][1]) > self.HUDDLE2*len(self.modellist) :##2개합쳐서 huddle2*4넘을때도하자
             if self.predicted_list[1][0] in self.undeflist: # 2순위가 undef일때
                 phase=1
@@ -224,18 +163,94 @@ class model():
     def seqToLabel(self,seq):
         dbConn = db_connector.DbConn()
         query = "SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no "
-        query = f"WHERE label_seq= {seq} and model_no = {self.model_no}"
+        query += f"WHERE label_seq = {seq} and model_no = {self.model_no}"
         result = dbConn.execute(query=query)[0][0]
         del(dbConn)
         return result
 
+    def log(self,timecheck):
+        self.log_cls_list=[]
+        self.log_cls_list=self.cls_list.copy()
+        if len(self.log_cls_list)==0 or self.log_cls_list==None:
+            self.log_cls_list=['NULL','NULL']
+        elif len(self.log_cls_list)==1: 
+            self.log_cls_list.append('NULL')
+        else:
+            pass
+        dbConn = db_connector.DbConn()
+        query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
+        query += f" VALUES(NOW() ,{self.str_no} , {self.model_no} , {self.img_no} , {self.log_cls_list[0]}, {self.log_cls_list[1]} , {timecheck} ,NOW(), NULL) RETURNING infer_no"
+        dbConn.insert(query=query)
+        self.infer_no=dbConn.lastpick(id=0)
+        for machine in self.modellist:
+            machine.log(self.img_no, self.infer_no)
+        del(dbConn)
+
     def __del__(self):
-        
+        pass
 
+class machine():
+    def __init__(self,info,gpu) -> None:
+        self.model_no           = info[0]
+        self.path               = info[1]
+        self.preprocess         = info[2]
+        self.ensemble_model_no  = info[3]
+        self.isload=False
+        self.load()
+        self.info()
+        os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+        os.environ["CUDA_VISIBLE_DEVICES"]=str(gpu)
+    def info(self):
+        print(f"machine {self.ensemble_model_no} init")
+    def load(self):
+        try:
+            self.model  = load_model(self.path)
+            self.isload = True
+        except:
+            self.model  = None
+            self.isload = False
+    def preprocessing(self,data):
+        ## img resize / x,y size가 다르면 error 캐치하기 나중에추가
+        data_resize=cv2.resize(data,(299,299))
+        predict_img = cv2.cvtColor(data_resize,cv2.COLOR_BGR2RGB)
+        self.x = image.image_utils.img_to_array(predict_img)
+        self.x = np.expand_dims(self.x, axis = 0)     ## efficientnet일 경우 preprocessing 필요 x
+        if self.preprocess=='Y':
+            self.x = preprocess_input(self.x)
+    def run(self, data):
+        self.preprocessing(data)
+        if self.isload:
+            self.softmax = self.model.predict(self.x,verbose = 0)[0]
+        else:
+            self.load()
+            self.softmax = self.model.predict(self.x,verbose = 0)[0]
+        self.predict=sort_predict(self.softmax) # 내림차순으로 정렬
 
+    def log(self,img_no,infer_no):
+        self.infer_no=infer_no
+        dbConn = db_connector.DbConn()
 
+        seq=self.predict[0][0]
+        result1=self.seqToLabel(seq)
+        seq=self.predict[1][0]
+        result2=self.seqToLabel(seq)
 
+        # prob 1,2 (점수)
+        prob1=self.predict[0][1]
+        prob2=self.predict[1][1]
+        query = "INSERT INTO ensemble_infer_history(infer_no, image_no, result1, result2, result1_prob, result2_prob,ensemble_model_no)"
+        query += f" VALUES({self.infer_no} ,{img_no},{result1},{result2},{prob1},{prob2},{self.ensemble_model_no} ) "
+        dbConn.insert(query=query)
 
+    def seqToLabel(self,seq):
+        dbConn = db_connector.DbConn()
+        query = "SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no "
+        query += f"WHERE label_seq = {seq} and model_no = {self.model_no}"
+        result = dbConn.execute(query=query)[0][0]
+        del(dbConn)
+        return result
+
+    
 
 ##########################################################################################
 ##########################################################################################

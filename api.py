@@ -1,16 +1,12 @@
 from flask import Flask, request, jsonify, render_template, send_from_directory, json
 from flask_cors import CORS
-import numpy as np
 import cv2
 import db_connector
 import ssl
 
-
-
-import base64
-import time
-
 import Infer as inf
+
+model_load_dict = {}
 
 def authorize(auth_key):
     query = f"SELECT * FROM auth where auth_cd = '{auth_key}' and act_yn='Y'"
@@ -70,19 +66,28 @@ def client_init():
     auth_key    = res['key']
     str_no      = res['str_no']
     isauth=authorize(auth_key)
-
+    global model_load_dict
     if isauth==False:
         return jsonify({'result' : 'fail'})
     # DB에서 api 형태로 query 정보를 받아오는 코드
     else:
         str_label_list = initialize(str_no)
-
+        if auth_key in list(model_load_dict.keys()):
+            print(f"MODEL NUMBER {model_no} has been already Loaded.")
+        else:
+            dbConn = db_connector.DbConn()
+            query = f"SELECT model_no FROM model WHERE str_no = {str_no}"
+            model_no=dbConn.select(query=query)[0][0]
+            model_init=inf.model(model_no,1)
+            model_load_dict[auth_key] = model_init# 나중엔 임시키 / gpu도 자동설정 str_no가 아니라 model_no으로 해야됨.
+            print(f"MODEL NUMBER {model_no} is Loaded.")
+            del(dbConn)
     return jsonify({'result' : 'ok', 'str_label_list':str_label_list})
 
 
 @app.route('/login', methods=['POST'])
 def login():
-
+    global model_load_dict
     res=request.get_json()
     # Flutter에서 해당 url로 email과 password를 post한 내용을 받아오는 코드
         # request 방식 확인 코드
@@ -141,7 +146,6 @@ def login():
         if login_dict['password'] == param_dict['password'] and login_dict['act_yn'] == 'Y':
             log_in_st = 0
             dict_result['result'] = 'ok'
-            query = f"SELECT * FROM login WHERE id = '{userID}';"
         elif login_dict['password'] == param_dict['password'] and login_dict['act_yn'] == 'N':
             log_in_st = 1
         else:
@@ -152,12 +156,25 @@ def login():
     else:
         log_in_st = 2
 
+    
+    str_no = login_dict['str_no']
+    query = f"SELECT model_no FROM model WHERE str_no = {str_no}"
+    model_no=dbConn.select(query=query)[0][0]
+
     # isIdExist랑 상관없이 무조건 return하는것
     dict_result['log_in_st'] = log_in_st
     dict_result['log_in_text'] = dict_text[log_in_st]
     
     if dict_result['result'] == 'ok':
         dict_result['label_init']=initialize(dict_result['str_no'])
+
+        # 모델 불러오기
+        if userID in list(model_load_dict.keys()):
+            print(f"MODEL NUMBER {model_no} has been already Loaded.")
+        else:
+            model_init=inf.model(model_no,0)
+            model_load_dict[userID] = model_init# 나중엔 임시키 / gpu도 자동설정 str_no가 아니라 model_no으로 해야됨.
+            print(f"MODEL NUMBER {model_no} is Loaded.")
     print(dict_result)
 
     # 비교 후 작성된 dict 내용을 json 혹은 ajax 형태로 flutter에 전송하기 위한 코드
@@ -167,198 +184,37 @@ def login():
 
 @app.route('/run', methods=['POST'])
 def run():
-    timecheck=current_milli_time()
-    res=request.get_json()
+    global model_load_dict
+    timecheck=inf.current_milli_time()
+    
     #json에서 data 받아오기
-    encoded_img = res['image']
-    x_size      = res['x_size']
-    y_size      = res['y_size']
-    img_channel = res['channel']
-    userID      = res['ID']
-    userPW      = res['PW']
-    auth_key    = res['key']
-    str_no      = res['str_no']
-    send_device = res['send_device']
-    auth        = res['auth'] # code or id
-    if auth == "code":
-        isauth=authorize(auth_key)
-    #elif auth=="id"
-    #   id/pw 매칭
+    res=request.get_json()
+    isauth=authorize(res['key'])
     if isauth == False: ## 인증키 없으면
         return jsonify({'result': 'fail'})
 
-    # 파일명 생성 및 이미지 저장
-    filename=now()+'.jpg'
-    save_file_path = './request_image/'+filename
-    while os.path.isfile(save_file_path):
-        filename= filename.split(".jpg")[0]+"(1).jpg"
-        save_file_path = './request_image/'+filename
-    print(save_file_path)
+    if res['ID']=='None':
+        model=model_load_dict[res['key']]
+    else :
+        model=model_load_dict[res['ID']]
 
-    # string to bytes & write
-    string_to_bytes = encoded_img.encode(encoding)
-    bytes_to_numpy = base64.decodebytes(string_to_bytes)
-    if send_device=="android" or send_device=="web":
-        list_bytes = []
-        bytes_to_numpy = bytes_to_numpy.split(b'[')[1].split(b']')[0].split(b', ')
-        for item in bytes_to_numpy:
-            list_bytes.append(int(item))
-        data = cv2.cvtColor(np.array(list_bytes, dtype=np.uint8).reshape((int(y_size), int(x_size), -1))[:, :, :3],cv2.COLOR_RGB2BGR)
-    else:
-        data = np.frombuffer(bytes_to_numpy, dtype=np.uint8).reshape((y_size, x_size, img_channel))
-    cv2.imwrite(save_file_path, data)
-
-    # insert image data into db
-    query = "INSERT INTO img_data(date,time,resol_x,resol_y,file_path)"
-    query += f" VALUES(NOW() ,NOW() , {x_size} , {y_size}, '{save_file_path[1:]}' ) RETURNING image_no"
-    dbConn = db_connector.DbConn()
-    dbConn.insert(query=query)
-    img_no=dbConn.lastpick() # pick image no
+    model.info()
+    model.setImageInfo(res)
+    model.saveImg()
+    model.runMachine()
+    cls_list=model.clsLogic()
+    
+    # run 전에 init하고 아이디(or 인증키) : 모델 로 딕셔너리해서
+    # key로 추론
+    
+    timecheck=inf.current_milli_time()-timecheck
+    model.log(timecheck)
 
 
-    ## img resize
-    data_resize=cv2.resize(data,(299,299))
-    predict_img = cv2.cvtColor(data_resize,cv2.COLOR_BGR2RGB)
-    x = image.image_utils.img_to_array(predict_img)
-    x = np.expand_dims(x, axis = 0)     ## efficientnet일 경우 preprocessing 필요 x
-    ## preprocessing 없는 모델은 여기서 추론
-    m4=modellist[3].predict(x,verbose = 0)[0]
-    ## preprocessing 필요하면 여기서 추론
-    x = preprocess_input(x)
-    m1=modellist[0].predict(x,verbose = 0)[0]
-    m2=modellist[1].predict(x,verbose = 0)[0]
-    m3=modellist[2].predict(x,verbose = 0)[0]
-
-    features=m1+m2+m3+m4 # 4개의 softmax값을 다 더한것
-    predicted_list=sort_predict(features) # 내림차순으로 정렬
-    max_predicted_set = {
-                        np.argmax(m1),
-                        np.argmax(m2),
-                        np.argmax(m3),
-                        np.argmax(m4)
-                        } #각 모델들의 1순위들 index (seq)
-
-    cls_list = [] #마지막에 request로 전송할 결과값 (label)
-    # undeflist 받아오기 (seq로)
-    query = "SELECT model_label.label_seq FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE item_label.valid_yn = 'N'"
-    undeflist = [data for inner_list in dbConn.select(query=query) for data in inner_list]
-
-    if predicted_list[0][0] in undeflist: ##1순위가 undef thing일때 (얘는 undefthing label number를 반환)
-        seq=predicted_list[0][0]
-        query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
-        result=dbConn.execute(query=query)[0][0]         
-        cls_list.append(result)
-        phase=1
-    elif predicted_list[0][1]>HUDDLE1*modelnum: ##1개만 출력
-        seq=predicted_list[0][0]
-        query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
-        result=dbConn.execute(query=query)[0][0]
-        cls_list.append(result)
-        phase=1
-    elif len(max_predicted_set)==modelnum: #undef출력 : -1
-        cls_list.append(-1)
-        phase=0
-    elif max(max(m1),max(m2),max(m3),max(m4)) < HUDDLE2: #undef출력 : -1
-        cls_list.append(-1)
-        phase=0
-    elif (predicted_list[0][1]+predicted_list[1][1]) > HUDDLE2*modelnum :##2개합쳐서 huddle2*4넘을때도하자
-        seq=predicted_list[0][0]
-        query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
-        result=dbConn.execute(query=query)[0][0]
-        cls_list.append(result)
-        if predicted_list[1][0] in undeflist: # 2순위가 undef일때
-            phase=1
-        else:
-            seq=predicted_list[1][0]
-            query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
-            result=dbConn.execute(query=query)[0][0]
-            cls_list.append(result)
-            phase=2
-    else:
-        cls_list.append(-1)  
-        phase=0
-    ## 영어이름으로줌
-    timecheck=current_milli_time()-timecheck
-    #반환값이 seq인데 이걸 label_no로 변환해서 줘야한다.
-
-    if phase==0: #undefined
-        query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
-        query += f" VALUES(NOW() ,{str_no} , {0} , {img_no} , {-1}, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
-        dbConn.insert(query=query)
-    elif phase==1: #1 items infer
-        query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
-        query += f" VALUES(NOW() ,{str_no} , {0} , {img_no} , {cls_list[0]}, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
-        dbConn.insert(query=query)
-    elif phase==2: #2 items infer
-        query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
-        query += f" VALUES(NOW() ,{str_no} , {0} , {img_no} , {cls_list[0]}, {cls_list[1]} , {timecheck} ,NOW(), NULL) RETURNING infer_no"
-        dbConn.insert(query=query)
-    else: # error
-        query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
-        query += f" VALUES(NOW() ,{str_no} , {0} , {img_no} , NULL, NULL , {timecheck} ,NOW(), NULL) RETURNING infer_no"
-        dbConn.insert(query=query)
-
-    infer_no=dbConn.lastpick(id=0)
 
     ## 앙상블 모델별 추론결과 저장
-    sort_m1=sort_predict(m1)
-    seq=sort_m1[0][0]
-    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
-    m1_result1=dbConn.execute(query=query)[0][0]
-    seq=sort_m1[1][0]
-    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
-    m1_result2=dbConn.execute(query=query)[0][0]
-    # prob 1,2 (점수)
-    m1_prob1=sort_m1[0][1]
-    m1_prob2=sort_m1[1][1]
-    query = "INSERT INTO ensemble_infer_history(infer_no, image_no, result1, result2, result1_prob, result2_prob,ensemble_model_no)"
-    query += f" VALUES({infer_no} ,{img_no},{m1_result1},{m1_result2},{m1_prob1},{m1_prob2},{1} ) "
-    dbConn.insert(query=query)
 
-    sort_m2=sort_predict(m2)
-    seq=sort_m2[0][0]
-    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
-    m2_result1=dbConn.execute(query=query)[0][0]
-    seq=sort_m2[1][0]
-    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
-    m2_result2=dbConn.execute(query=query)[0][0]
-    # prob 1,2 (점수)
-    m2_prob1=sort_m2[0][1]
-    m2_prob2=sort_m2[1][1]
-    query = "INSERT INTO ensemble_infer_history(infer_no, image_no, result1, result2, result1_prob, result2_prob,ensemble_model_no)"
-    query += f" VALUES({infer_no} ,{img_no},{m2_result1},{m2_result2},{m2_prob1},{m2_prob2},{2} ) "
-    dbConn.insert(query=query)
-
-    sort_m3=sort_predict(m3)
-    seq=sort_m3[0][0]
-    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
-    m3_result1=dbConn.execute(query=query)[0][0]
-    seq=sort_m3[1][0]
-    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
-    m3_result2=dbConn.execute(query=query)[0][0]
-    # prob 1,2 (점수)
-    m3_prob1=sort_m3[0][1]
-    m3_prob2=sort_m3[1][1]
-    query = "INSERT INTO ensemble_infer_history(infer_no, image_no, result1, result2, result1_prob, result2_prob,ensemble_model_no)"
-    query += f" VALUES({infer_no} ,{img_no},{m3_result1},{m3_result2},{m3_prob1},{m3_prob2},{3} ) "
-    dbConn.insert(query=query)
-
-    sort_m4=sort_predict(m4)
-    seq=sort_m4[0][0]
-    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
-    m4_result1=dbConn.execute(query=query)[0][0]
-    seq=sort_m4[1][0]
-    query = f"SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no WHERE label_seq= {seq} and model_no = 0"
-    m4_result2=dbConn.execute(query=query)[0][0]
-    # prob 1,2 (점수)
-    m4_prob1=sort_m4[0][1]
-    m4_prob2=sort_m4[1][1]
-    query = "INSERT INTO ensemble_infer_history(infer_no, image_no, result1, result2, result1_prob, result2_prob,ensemble_model_no)"
-    query += f" VALUES({infer_no} ,{img_no},{m4_result1},{m4_result2},{m4_prob1},{m4_prob2},{4} ) "
-    dbConn.insert(query=query)
-
-    del(dbConn)
-    return jsonify({'result': 'ok', 'cls_list': cls_list, 'infer_no' :infer_no }) #feedback을 위해서 infer_no도 반환
+    return jsonify({'result': 'ok', 'cls_list': cls_list, 'infer_no' :model.infer_no }) #feedback을 위해서 infer_no도 반환
 
 @app.route('/infer_feedback', methods=['POST'])
 def infer_feedback():
@@ -444,13 +300,11 @@ def auth():
     del(dbConn)
     return jsonify({'result': auth_lst, 'authorization_result' : auth_result})
 
-
 @app.route('/log', methods=['GET', 'POST'])
 def log():
     param_dict = request.args.to_dict()
     print(param_dict['test'])
     return jsonify({'result': 'ok'})
-
 
 @app.route('/test', methods=['POST'])
 def test():

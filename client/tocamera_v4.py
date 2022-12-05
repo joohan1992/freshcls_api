@@ -13,9 +13,9 @@ import sys
 encoding = sys.getdefaultencoding()
 
 #INFER_URL = 'http://10.28.100.11:8080//run'
-INFER_URL = 'https://10.28.78.30:8889/run'
-FEEDBACK_URL="https://10.28.78.30:8889/infer_feedback"
-INIT_URL="https://10.28.78.30:8889/client_init"
+INFER_URL = 'https://10.28.78.30:8091/run'
+FEEDBACK_URL="https://10.28.78.30:8091/infer_feedback"
+INIT_URL="https://10.28.78.30:8091/client_init"
 CRUDENTIAL_KEY="7{@:M8IR;DW\\/X71uhHOd[nxa@uB%+m(/<Owq5LZ.kO%K583{t-fDb'GkE$YscX?N`X}M=WnMC<Ed}a4.$.lvDPL=q;i237fvcDjPPXmY`r.FU`@D*nQ]mBTNb#t7_Qw*Tr?f6]aTWm},Z(8L&^xI$^5Ccru'a.}'/uaN+{d\\Ox#FWv(ZT,>8vVC}kc2q2&'.qddiHnN}^*L]A*ZMT,{soMw@BrppFG[OIrv_bD/b67H:H0-;dxDID/Y[Yhz{y~VUVG|(aZ]]xj[jB*q)ARPA>)S._*JH]iE!zlnFzBatlkAfvy"
 
 print("Program Starting")
@@ -30,7 +30,7 @@ DEVICENUM=0
 CAM_NAME="Camera"
 BOARD_NAME="Board"
 RTSP=""
-STR_NO=0
+STR_NO=1
 res = requests.post(INIT_URL,
         json={  "key": CRUDENTIAL_KEY,
                 "str_no": STR_NO
@@ -39,11 +39,14 @@ result=res.json()['str_label_list']
 item_Eng={}
 item_Kor={}
 for i in result:
-    item_Eng[i[0]]=i[1]
-    item_Kor[i[0]]=i[2]    
+    item_Eng[i[0]]=str(i[1]).split("_")[0]
+    item_Kor[i[0]]=str(i[2]).split("_")[0]
+
 item_Kor[-1]=UNDEFMSG
 item_Eng[-1]=UNDEFMSG
 
+print(item_Kor)
+print(item_Eng)
 # 리스트 순회하면서 0번째 -> 1번째 (영어)
 # 리스트 순회하면서 0번째 -> 2번째 (한글)
 # 리스트 순회하면서 0번째 -> 3번째 (코드)
@@ -266,12 +269,12 @@ while(True):
                                     json={  "image" : imgstr,
                                             "x_size":IMGSIZE[0],
                                             "y_size":IMGSIZE[1],
-                                            "channel":3,
                                             "key":CRUDENTIAL_KEY,
-                                            "str_no":0,
+                                            "str_no":STR_NO,
                                             "auth":"code",
                                             "ID":"None",
-                                            "PW":"None"
+                                            "PW":"None",
+                                            "send_device" : "client"
                                             }, verify=False)
                 if res.json()['result']=="ok":
                     cls_list=res.json()['cls_list']
