@@ -12,10 +12,11 @@ import base64
 import sys
 encoding = sys.getdefaultencoding()
 
-#INFER_URL = 'http://10.28.100.11:8080//run'
-INFER_URL = 'https://10.28.78.30:8091/run'
-FEEDBACK_URL="https://10.28.78.30:8091/infer_feedback"
-INIT_URL="https://10.28.78.30:8091/client_init"
+URL = 'https://10.28.78.30:8091/'
+#URL = 'https://10.28.100.11:5444/'
+INFER_URL = URL + 'run'
+FEEDBACK_URL = URL + 'infer_feedback'
+INIT_URL = URL + 'client_init'
 CRUDENTIAL_KEY="7{@:M8IR;DW\\/X71uhHOd[nxa@uB%+m(/<Owq5LZ.kO%K583{t-fDb'GkE$YscX?N`X}M=WnMC<Ed}a4.$.lvDPL=q;i237fvcDjPPXmY`r.FU`@D*nQ]mBTNb#t7_Qw*Tr?f6]aTWm},Z(8L&^xI$^5Ccru'a.}'/uaN+{d\\Ox#FWv(ZT,>8vVC}kc2q2&'.qddiHnN}^*L]A*ZMT,{soMw@BrppFG[OIrv_bD/b67H:H0-;dxDID/Y[Yhz{y~VUVG|(aZ]]xj[jB*q)ARPA>)S._*JH]iE!zlnFzBatlkAfvy"
 
 print("Program Starting")
@@ -62,68 +63,79 @@ isWrite=False
 phase=0
 camerastate=0
 
-f_config = open('./config.txt', 'r')
-lines = f_config.read()
-print("Read Configuration")
-sp_lines = lines.split('\n')
-for line in sp_lines:
-    token = line.split('\t')
-    title = token[0]
-    if title == 'DEVICENUM':
-        DEVICENUM = int(token[1])
-    elif title == 'RTSP':
-        RTSP = str(token[1])
-    elif title == 'INFER_URL':
-        INFER_URL = str(token[1])
-    elif title == 'FEEDBACK_URL':
-        FEEDBACK_URL = str(token[1])
-    elif title == 'INIT_URL':
-        INIT_URL = str(token[1])
-    elif title == 'CAM_MOVE_X':
-        CAM_MOVE_X = str(token[1])
-    elif title == 'CAM_MOVE_Y':
-        CAM_MOVE_Y = str(token[1])
-    elif title == 'CAM_NAME':
-        CAM_NAME = str(token[1])
-    elif title == 'BOARD_NAME':
-        BOARD_NAME = str(token[1])        
-    elif title == 'LOGSRC':
-        LOGSRC = str(token[1])
-    elif title == 'LOADIMGSRC':
-        LOADIMGSRC = str(token[1])    
-    elif title == 'KEY':
-        CRUDENTIAL_KEY = str(token[1])
-    elif title == 'Undefined Message':
-        UNDEFMSG = str(token[1])
-    elif title == 'IMGSIZE':
-        IMGSIZE = ( int(str(token[1]).replace("(","").replace(")","").split(",")[0]),
-                    int(str(token[1]).replace("(","").replace(")","").split(",")[1]))
+try:
+    f_config = open('./config.txt', 'r')
+    lines = f_config.read()
+    print("Read Configuration")
+    sp_lines = lines.split('\n')
+    for line in sp_lines:
+        token = line.split('\t')
+        title = token[0]
+        if title == 'DEVICENUM':
+            DEVICENUM = int(token[1])
+        elif title == 'RTSP':
+            RTSP = str(token[1])
+        elif title == 'URL':
+            URL = str(token[1])
+            INFER_URL = URL + 'run'
+            FEEDBACK_URL = URL + 'infer_feedback'
+            INIT_URL = URL + 'client_init'
+        elif title == 'INFER_URL':
+            INFER_URL = str(token[1])
+        elif title == 'FEEDBACK_URL':
+            FEEDBACK_URL = str(token[1])
+        elif title == 'INIT_URL':
+            INIT_URL = str(token[1])
+        elif title == 'CAM_MOVE_X':
+            CAM_MOVE_X = int(token[1])
+        elif title == 'CAM_MOVE_Y':
+            CAM_MOVE_Y = int(token[1])
+        elif title == 'CAM_NAME':
+            CAM_NAME = str(token[1])
+        elif title == 'BOARD_NAME':
+            BOARD_NAME = str(token[1])        
+        elif title == 'LOGSRC':
+            LOGSRC = str(token[1])
+        elif title == 'LOADIMGSRC':
+            LOADIMGSRC = str(token[1])    
+        elif title == 'KEY':
+            CRUDENTIAL_KEY = str(token[1])
+        elif title == 'Undefined Message':
+            UNDEFMSG = str(token[1])
+        elif title == 'IMGSIZE':
+            IMGSIZE = ( int(str(token[1]).replace("(","").replace(")","").split(",")[0]),
+                        int(str(token[1]).replace("(","").replace(")","").split(",")[1]))
+except:
+    print("Set Default Options. If you want to change options, write them in the [config.txt] file.")
+LABELSIZE=(int(253*IMGSIZE[0]/280),int(57*IMGSIZE[1]/210))
 
 print("Function Loading")
 
-
 def label_to_board(item_num,item,label1,label2=None):
     if item_num==1:
-        for i in range(0,56):
-            for j in range(0,252):
-                item[130+i][14+j]=label1[i][j]
+        label1 = cv2.resize(label1, LABELSIZE)
+        for i in range(0,LABELSIZE[1]-1):
+            for j in range(0,LABELSIZE[0]-1):
+                item[int(IMGSIZE[1]*13/21)+i][int((IMGSIZE[0]-LABELSIZE[0]+1)/2)+j]=label1[i][j]
         return item
     else:
-        for i in range(0,56):
-            for j in range(0,252):
-                item[70+i][14+j]=label1[i][j]
-        for i in range(0,56):
-            for j in range(0,252):
-                item[130+i][14+j]=label2[i][j]
+        label1 = cv2.resize(label1, LABELSIZE)
+        label2 = cv2.resize(label2, LABELSIZE)
+        for i in range(0,LABELSIZE[1]-1):
+            for j in range(0,LABELSIZE[0]-1):
+                item[int(IMGSIZE[1]/3)+i][int((IMGSIZE[0]-LABELSIZE[0]+1)/2)+j]=label1[i][j]
+        for i in range(0,LABELSIZE[1]-1):
+            for j in range(0,LABELSIZE[0]-1):
+                item[int(IMGSIZE[1]*13/21)+i][int((IMGSIZE[0]-LABELSIZE[0]+1)/2)+j]=label2[i][j]
 def btctrl(event, x, y, flags, param):
    global btclk
    global phase
    if phase==2:
        if event==cv2.EVENT_LBUTTONDOWN:
-            if (x>14 and x<266) and (y>70 and y<126):
+            if (x>int((IMGSIZE[0]-LABELSIZE[0]+1)/2) and x<int((IMGSIZE[0]+LABELSIZE[0]+1)/2)) and (y>int(IMGSIZE[1]/3) and y<int((IMGSIZE[1]/3)+LABELSIZE[1])):
                 log(message=item_Kor[cls_list[0]],filepath=LOGSRC)
                 phase=21
-            elif (x>14 and x<266) and (y>130 and y<186):
+            elif (x>int((IMGSIZE[0]-LABELSIZE[0]+1)/2) and x<int((IMGSIZE[0]+LABELSIZE[0]+1)/2)) and (y>int(IMGSIZE[1]*13/21) and y<int((IMGSIZE[1]*13/21)+LABELSIZE[1])):
                 log(message=item_Kor[cls_list[1]],filepath=LOGSRC)
                 phase=22
             else:
@@ -135,10 +147,6 @@ def log(message,filepath,wtype="w"):
     file = open(filepath, wtype)
     file.write(message)
     file.close()
-def now():
-    now = datetime.now()
-    string = str(now).replace(":", "-")
-    return string[0:10]+"_"+string[11:22]
 def switching(input):
     input = False if input == True else True
     return input
@@ -184,7 +192,7 @@ def camera():
             ret, frame_origin = capture.read()
             frame = cv2.resize(frame_origin, IMGSIZE)
             CAM_frame=frame.copy()
-            cv2.putText(CAM_frame,"V4", (0, 30),cv2.FONT_HERSHEY_DUPLEX, 1, (0,0,0), 1, cv2.LINE_AA)
+            cv2.putText(CAM_frame,"CAM", (0, 30),cv2.FONT_HERSHEY_DUPLEX, 1, (0,0,0), 1, cv2.LINE_AA)
             cv2.imshow(CAM_NAME,CAM_frame)
             key = cv2.waitKey(1)
             if key & 0xFF == ord('q'):
@@ -199,7 +207,6 @@ t.start()
 ###
 
 while(True):
-    cv2.setWindowProperty(BOARD_NAME, cv2.WND_PROP_TOPMOST, 1)
     if frame is not None:
         if ret != True:  # read에 실패하면 loop탈출
           break

@@ -1,34 +1,13 @@
-from keras.models import load_model
-from keras.applications.inception_v3 import preprocess_input
-from keras.preprocessing import image
-import os
-from datetime import datetime
-import sys
-import db_connector
-import time
+from flask import Flask, request, jsonify, render_template, send_from_directory, json
+from flask_cors import CORS
 import cv2
-import numpy as np
-import base64
+import db_connector
+import ssl
 
-def now():
-    now = datetime.now()
-    string = str(now).replace(":", "-")
-    return string[0:10]+"_"+string[11:22]
-def current_milli_time():
-    return round(time.time() * 1000)
-def sort_predict(predict):
-    """
-    predict의 index와 값을 tuple로 하는 list를
-    내림차순으로 정렬한 값을 반환하는 함수입니다.
+import Infer as inf
 
-    predict(list) : infer한 list
-    return : [(seq , prob), ...]
-    """
-    predict_dict={}
-    for i in range(len(predict)):
-        predict_dict[i]=predict[i]
-    predict_dict=(sorted(predict_dict.items(), key=lambda x: x[1], reverse=True))
-    return predict_dict
+model_load_dict = {}
+
 def authorize(auth_key):
     query = f"SELECT * FROM auth where auth_cd = '{auth_key}' and act_yn='Y'"
     dbConn = db_connector.DbConn()
@@ -36,225 +15,316 @@ def authorize(auth_key):
     del(dbConn)
     return False if len(result)==0 else True
 
-encoding = sys.getdefaultencoding()
-class model():
-    def __init__(self,model_no,gpu) -> None: ## 이건 클라킬때 한번 해야됨.
-        dbConn = db_connector.DbConn()
-        self.model_no=model_no
-        query = "SELECT ensemble_model.model_no, ensemble_model.model_path, ensemble_model.preprocess, ensemble_model.ensemble_model_no "
-        query+= f"FROM ensemble_model LEFT JOIN model ON (model.model_no = ensemble_model.model_no) WHERE model.model_no={model_no}"
-        self.ensemble_list=dbConn.select(query=query)
-        self.modellist=[]
-        for info in self.ensemble_list:
-            self.modellist.append(machine(info,gpu=str(gpu))) # 뒤에숫자 gpu
-        query =  "SELECT model_label.label_seq FROM model_label LEFT JOIN item_label "
-        query += "ON model_label.label_no = item_label.label_no "
-        query += f"WHERE item_label.valid_yn = 'N' and model_label.model_no = {model_no}"
-        self.undeflist = [data for inner_list in dbConn.select(query=query) for data in inner_list]
-        self.HUDDLE1=0.8
-        self.HUDDLE2=0.7
-        self.cls_list = []
-        del(dbConn)
-    def setHuddle(self,huddle1,huddle2):
-        self.HUDDLE1=huddle1
-        self.HUDDLE2=huddle2
-    def info(self):
-        print("Model Num : "+str(self.model_no))
-    def setImageInfo(self,res):
-        self.encoded_img = res['image']
-        self.x_size      = res['x_size']
-        self.y_size      = res['y_size']
-        self.userID      = res['ID']
-        self.userPW      = res['PW']
-        self.auth_key    = res['key']
-        self.str_no      = res['str_no']
-        self.send_device = res['send_device']
-        self.auth        = res['auth'] # code or id
-    def saveImg(self):  
-        # set filename
-        filename=now()+'.jpg'
-        self.save_file_path = './request_image/'+filename
-        while os.path.isfile(self.save_file_path):
-            filename = filename.split(".jpg")[0]+"(1).jpg"
-            self.save_file_path = './request_image/' + filename
-        print(self.save_file_path)
+app = Flask(__name__, template_folder='web')
+CORS(app, support_credentials=True)
 
-        # string to bytes & write
-        string_to_bytes = self.encoded_img.encode(encoding)
-        bytes_to_numpy = base64.decodebytes(string_to_bytes)
-        if self.send_device=="android" or self.send_device=="web":
-            list_bytes = []
-            bytes_to_numpy = bytes_to_numpy.split(b'[')[1].split(b']')[0].split(b', ')
-            for item in bytes_to_numpy:
-                list_bytes.append(int(item))
-            self.data = cv2.cvtColor(np.array(list_bytes, dtype=np.uint8).reshape((int(self.y_size), int(self.x_size), -1))[:, :, :3],cv2.COLOR_RGB2BGR)
+FLUTTER_WEB_APP = 'web'
+
+def initialize(str_no):
+    # 전달받은 str_no로 사용하고 있는 model_no 찾기
+    query = f"SELECT model_no, act_yn from model where str_no={str_no} and use_yn= 'Y'"
+    dbConn = db_connector.DbConn()
+
+    model_no = dbConn.select(query=query)[0][0]   ##model_no
+    model_state= dbConn.select(query=query)[0][1] ##act_yn
+
+    if model_state == "N":
+        return "fail"
+
+    query = "SELECT model_label.label_no, item_label.label_nm_eng, item_label.label_nm_kor, item_cd FROM" # 라벨 / 영어 / 한글 / 아이템코드 전달(해당모델)
+    query+= f" model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no where model_label.model_no={model_no}" #modelnum
+    str_label_list=dbConn.select(query=query)
+    str_label_list.append([-1, 'Undefined', 'Undefined','None'])
+    del(dbConn)
+
+    return str_label_list #feedback을 위해서 infer_no도 반환
+
+@app.route('/web/')
+def render_page_web():
+    return render_template('index.html')
+
+@app.route('/web/<path:name>')
+def return_flutter_doc(name):
+
+    datalist = str(name).split('/')
+    DIR_NAME = FLUTTER_WEB_APP
+
+    if len(datalist) > 1:
+        for i in range(0, len(datalist) - 1):
+            DIR_NAME += '/' + datalist[i]
+
+    return send_from_directory(DIR_NAME, datalist[-1])
+
+@app.route('/client_init', methods=['POST'])
+def client_init():
+    '''
+    input   :   'key'   /   'str_no'
+    output  :   result : 'ok' / 'fail'
+                str_label_list : list
+    '''
+    res=request.get_json()
+    auth_key    = res['key']
+    str_no      = res['str_no']
+    isauth=authorize(auth_key)
+    dbConn = db_connector.DbConn()
+    query = f"SELECT model_no FROM model WHERE str_no = {str_no}"
+    model_no=dbConn.select(query=query)[0][0]
+    global model_load_dict
+    if isauth==False:
+        return jsonify({'result' : 'fail'})
+    # DB에서 api 형태로 query 정보를 받아오는 코드
+    else:
+        str_label_list = initialize(str_no)
+        if auth_key in list(model_load_dict.keys()):
+            print(f"MODEL NUMBER {model_no} has been already Loaded.")
         else:
-            self.data = np.frombuffer(bytes_to_numpy, dtype=np.uint8).reshape((self.y_size, self.x_size, -1))
-        cv2.imwrite(self.save_file_path, self.data)
+            model_init=inf.model(model_no,1)
+            model_load_dict[auth_key] = model_init# 나중엔 임시키 / gpu도 자동설정 str_no가 아니라 model_no으로 해야됨.
+            print(f"MODEL NUMBER {model_no} is Loaded.")
+            del(dbConn)
+    return jsonify({'result' : 'ok', 'str_label_list':str_label_list})
 
-        # insert image data into db
-        query = "INSERT INTO img_data(date,time,resol_x,resol_y,file_path)"
-        query += f" VALUES(NOW() ,NOW() , {self.x_size} , {self.y_size}, '{self.save_file_path[1:]}' ) RETURNING image_no"
-        dbConn = db_connector.DbConn()
-        dbConn.insert(query=query)
 
-        self.img_no=dbConn.lastpick() # pick image no
+@app.route('/login', methods=['POST'])
+def login():
+    global model_load_dict
+    res=request.get_json()
+    # Flutter에서 해당 url로 email과 password를 post한 내용을 받아오는 코드
+        # request 방식 확인 코드
+    userID = str(res['id'])
+    userPW = str(res['password'])
+    params = [userID, userPW]
+    print(params)
+    param_dict = dict(zip(['id', 'password'], params))
 
-        del(dbConn)
+    # DB에서 api 형태로 query 정보를 받아오는 코드
 
-    def runMachine(self):
-        for i in self.modellist:
-            i.run(self.data)
-        self.max_predicted_set()
-        self.clsLogic()
+    query = f"SELECT * FROM login WHERE id = '{userID}';"
+    dbConn = db_connector.DbConn()
 
-    def max_predicted_set(self):
-        self.predicted_set = set()
-        self.maximumSoftmax=-1
-        temp=0 # 이거 어떻게 없이 한줄로 하는코드있으면 좋겠다.
-        for i in self.modellist:
-            self.predicted_set.add(i.predict[0][0])
-            if i.predict[0][1] > self.maximumSoftmax:
-                self.maximumSoftmax = i.predict[0][1]
-            if temp==0:
-                features  = i.softmax
-            else:
-                features += i.softmax
-            temp+=1
-        self.predicted_list=sort_predict(features) # 내림차순으로 정렬
-        return self.predicted_set
-        #각 모델들의 1순위들 index (seq)
-    #0개 / 1개 / 2개 잖아.
-    def clsLogic(self):
-        self.cls_list=[]
-        phase=-1
-        if self.predicted_list[0][0] in self.undeflist: ##1순위가 undef thing일때 (얘는 undefthing label number를 반환)
-            phase=1
-        elif self.predicted_list[0][1]>self.HUDDLE1*len(self.modellist): ##1개만 출력
-            phase=1
-        elif len(self.predicted_set)==len(self.modellist): #undef출력 : -1
-            phase=0
-        elif self.maximumSoftmax < self.HUDDLE2: #undef출력 : -1
-            phase=0
-        elif (self.predicted_list[0][1]+self.predicted_list[1][1]) > self.HUDDLE2*len(self.modellist) :##2개합쳐서 huddle2*4넘을때도하자
-            if self.predicted_list[1][0] in self.undeflist: # 2순위가 undef일때
-                phase=1
-            else:
-                phase=2
+    ##아이디가 있나없나 보는거
+    login_data = dbConn.select(query=query)
+    login_dict = None
+    if len(login_data) > 0:
+        login_dict = dict(zip(['id', 'password', 'login_no', 'act_yn', 'str_no'],login_data[0]))
+        print(login_dict)
+        isIdExist = True
+    else:
+        isIdExist = False
+
+    # Flutter에서 받아온 정보를 DB에서 받아온 정보와 비교하여 POST할 dict를 작성하는 코드
+    # flutter에 전송할 dictionary
+    # 형태는 {act_yn, login_no, str_no, log_in_state, log_in_text}
+    '''
+        result = 'ok' / 'fail'
+        act_yn = 'Y' / 'N'
+        login_no = 해당 로그인 정보
+        str_no = 매장 정보
+        log_in_st    =  0 : 로그인 성공 + 인증 Y, 
+                        1 : 로그인 성공 + 인증 N, 
+                        2 : ID 오류, 
+                        3 : PW 오류(ID는 맞으나 PW 틀림)
+        log_in_text =   0 : '로그인 및 인증을 모두 성공했습니다.' ,
+                        1 : '인증이 되지 않은 로그인 정보입니다.',
+                        2 : 'ID가 틀렸습니다.', 
+                        3 : 'PW가 틀렸습니다.' 
+    '''
+    dict_result = {}
+    dict_text = {   0 : '로그인 및 인증을 모두 성공했습니다.',
+                    1 : '인증이 되지 않은 로그인 정보입니다.',
+                    2 : 'ID가 틀렸습니다.', 
+                    3 : 'PW가 틀렸습니다.',
+                    4 : '인증 오류 발생'    }
+    
+    # 초기화
+    log_in_st = 4
+    dict_result['log_in_st'] = log_in_st 
+    dict_result['result'] = 'fail'
+
+    ## 5개 다 받아오긴함 패스워드랑 act까지 통과하면 ok
+    if isIdExist: 
+        if login_dict['password'] == param_dict['password'] and login_dict['act_yn'] == 'Y':
+            log_in_st = 0
+            dict_result['result'] = 'ok'
+        elif login_dict['password'] == param_dict['password'] and login_dict['act_yn'] == 'N':
+            log_in_st = 1
         else:
-            phase=0        
-        ####분류끝
-        if phase==1:
-            seq=self.predicted_list[0][0]
-            result=self.seqToLabel(seq)        
-            self.cls_list.append(result)
-        elif phase==2:
-            seq=self.predicted_list[0][0]
-            result=self.seqToLabel(seq)        
-            self.cls_list.append(result)
-            seq=self.predicted_list[1][0]
-            result=self.seqToLabel(seq)
-            self.cls_list.append(result)            
-        else:
-            self.cls_list.append(-1)
-        #### cls_list에 넣기
-        return self.cls_list
-
-    def seqToLabel(self,seq):
-        dbConn = db_connector.DbConn()
-        query = "SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no "
-        query += f"WHERE label_seq = {seq} and model_no = {self.model_no}"
-        result = dbConn.execute(query=query)[0][0]
-        del(dbConn)
-        return result
-
-    def log(self,timecheck):
-        self.log_cls_list=[]
-        self.log_cls_list=self.cls_list.copy()
-        if len(self.log_cls_list)==0 or self.log_cls_list==None:
-            self.log_cls_list=['NULL','NULL']
-        elif len(self.log_cls_list)==1: 
-            self.log_cls_list.append('NULL')
-        else:
-            pass
-        dbConn = db_connector.DbConn()
-        query = "INSERT INTO infer_history(date, str_no, model_no, image_no, result1, result2, infer_speed, time, feedback)"
-        query += f" VALUES(NOW() ,{self.str_no} , {self.model_no} , {self.img_no} , {self.log_cls_list[0]}, {self.log_cls_list[1]} , {timecheck} ,NOW(), NULL) RETURNING infer_no"
-        dbConn.insert(query=query)
-        self.infer_no=dbConn.lastpick(id=0)
-        for machine in self.modellist:
-            machine.log(self.img_no, self.infer_no)
-        del(dbConn)
-
-    def __del__(self):
-        pass
-
-class machine():
-    def __init__(self,info,gpu) -> None:
-        os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-        os.environ["CUDA_VISIBLE_DEVICES"]='"'+str(gpu)+'"'
-        self.model_no           = info[0]
-        self.path               = info[1]
-        self.preprocess         = info[2]
-        self.ensemble_model_no  = info[3]
-        self.isload=False
-        self.load()
-        self.info()
-    def info(self):
-        if self.isload:
-            print(f"machine {self.ensemble_model_no} init")
-        else:
-            print(f"machine {self.ensemble_model_no} cannot load file.")
-    def load(self):
-        try:
-            self.model  = load_model(self.path)
-            self.isload = True
-        except Exception as e:
-            self.model  = None
-            self.isload = False
-            print(e)
-    def preprocessing(self,data):
-        ## img resize / x,y size가 다르면 error 캐치하기 나중에추가
-        data_resize=cv2.resize(data,(299,299))
-        predict_img = cv2.cvtColor(data_resize,cv2.COLOR_BGR2RGB)
-        self.x = image.image_utils.img_to_array(predict_img)
-        self.x = np.expand_dims(self.x, axis = 0)     ## efficientnet일 경우 preprocessing 필요 x
-        if self.preprocess=='Y':
-            self.x = preprocess_input(self.x)
-    def run(self, data):
-        self.preprocessing(data)
-        if self.isload:
-            self.softmax = self.model.predict(self.x,verbose = 0)[0]
-        else:
-            self.load()
-            self.softmax = self.model.predict(self.x,verbose = 0)[0]
-        self.predict=sort_predict(self.softmax) # 내림차순으로 정렬
-
-    def log(self,img_no,infer_no):
-        self.infer_no=infer_no
-        dbConn = db_connector.DbConn()
-
-        seq=self.predict[0][0]
-        result1=self.seqToLabel(seq)
-        seq=self.predict[1][0]
-        result2=self.seqToLabel(seq)
-
-        # prob 1,2 (점수)
-        prob1=self.predict[0][1]
-        prob2=self.predict[1][1]
-        query = "INSERT INTO ensemble_infer_history(infer_no, image_no, result1, result2, result1_prob, result2_prob,ensemble_model_no)"
-        query += f" VALUES({self.infer_no} ,{img_no},{result1},{result2},{prob1},{prob2},{self.ensemble_model_no} ) "
-        dbConn.insert(query=query)
-
-    def seqToLabel(self,seq):
-        dbConn = db_connector.DbConn()
-        query = "SELECT model_label.label_no FROM model_label LEFT JOIN item_label ON model_label.label_no = item_label.label_no "
-        query += f"WHERE label_seq = {seq} and model_no = {self.model_no}"
-        result = dbConn.execute(query=query)[0][0]
-        del(dbConn)
-        return result
+            log_in_st = 3
+        dict_result['str_no'] = login_dict['str_no']
+        dict_result['act_yn'] = login_dict['act_yn']
+        dict_result['login_no'] = login_dict['login_no'] # 아이디가 있을때만 return
+    else:
+        log_in_st = 2
 
     
+    str_no = login_dict['str_no']
+    query = f"SELECT model_no FROM model WHERE str_no = {str_no}"
+    model_no=dbConn.select(query=query)[0][0]
 
-##########################################################################################
-##########################################################################################
+    # isIdExist랑 상관없이 무조건 return하는것
+    dict_result['log_in_st'] = log_in_st
+    dict_result['log_in_text'] = dict_text[log_in_st]
+    
+    if dict_result['result'] == 'ok':
+        dict_result['label_init']=initialize(dict_result['str_no'])
+
+        # 모델 불러오기
+        if userID in list(model_load_dict.keys()):
+            print(f"MODEL NUMBER {model_no} has been already Loaded.")
+        else:
+            model_init=inf.model(model_no,0)
+            model_load_dict[userID] = model_init# 나중엔 임시키 / gpu도 자동설정 str_no가 아니라 model_no으로 해야됨.
+            print(f"MODEL NUMBER {model_no} is Loaded.")
+    print(dict_result)
+
+    # 비교 후 작성된 dict 내용을 json 혹은 ajax 형태로 flutter에 전송하기 위한 코드
+    # res = requests.post("https://192.168.0.108:2092/login", data = json.dumps(dict_result), verify = False)
+    del(dbConn)
+    return jsonify(dict_result)
+
+@app.route('/run', methods=['POST'])
+def run():
+    global model_load_dict
+    timecheck=inf.current_milli_time()
+    
+    #json에서 data 받아오기
+    res=request.get_json()
+    isauth=authorize(res['key'])
+    if isauth == False: ## 인증키 없으면
+        return jsonify({'result': 'fail'})
+
+    if res['ID']=='None':
+        model=model_load_dict[res['key']]
+    else :
+        model=model_load_dict[res['ID']]
+
+    model.info()
+    model.setImageInfo(res)
+    model.saveImg()
+    model.runMachine()
+    cls_list=model.clsLogic()
+    
+    # run 전에 init하고 아이디(or 인증키) : 모델 로 딕셔너리해서
+    # key로 추론
+    
+    timecheck=inf.current_milli_time()-timecheck
+    model.log(timecheck)
+
+
+
+    ## 앙상블 모델별 추론결과 저장
+
+    return jsonify({'result': 'ok', 'cls_list': cls_list, 'infer_no' :model.infer_no }) #feedback을 위해서 infer_no도 반환
+
+@app.route('/infer_feedback', methods=['POST'])
+def infer_feedback():
+    res = request.get_json()
+    auth_key = res['key']
+    auth =     res['auth'] # code or id
+    if auth=="code":
+        isauth=authorize(auth_key)
+    #elif auth=="id"
+    #   id/pw 매칭
+    if isauth==False: ## 인증키 없으면
+        return jsonify({'result': 'fail'})
+    feedback=res['feedback'] # client랑 소통하는건 label_no으로만
+    infer_no=res['infer_no']
+
+    dbConn = db_connector.DbConn()
+    query = f"UPDATE infer_history SET feedback = {feedback} WHERE infer_no = {infer_no}"
+    dbConn.insert(query=query)
+    del(dbConn)
+    return jsonify({'result': 'ok' })
+
+
+@app.route('/get_model', methods=['GET', 'POST'])
+def get_model():
+    # GET 파라메터 받아와서 dict로 변환
+    param_dict = request.args.to_dict()
+
+    # 기본 모델 조회 쿼리(조건 언제나 TRUE)
+    query = "SELECT * FROM model WHERE 1=1 "
+
+    # 파라메터에 act_yn이 있으면 조건 추가
+    cond = ''
+    if 'act_yn' in param_dict:
+        cond = f"AND act_yn = '{param_dict['act_yn']}'"
+    query += cond
+
+    # DB 객체 생성
+    dbConn = db_connector.DbConn()
+    # 쿼리 실행
+    result = dbConn.select(query)
+    del(dbConn)
+    # 결과 반환
+    return jsonify({'result': 'ok', 'value': result})
+
+@app.route('/auth', methods=('GET', 'POST'))
+def auth():
+
+    param_dict = request.args.to_dict()
+
+    query = "SELECT * FROM auth WHERE 1=1 "
+
+    cond = ''
+    if 'act_yn' in param_dict:
+        cond = f"AND act_yn = '{param_dict['act_yn']}'"
+    query += cond
+
+    if 'auth_cd' in param_dict:
+        cond = f"AND auth_cd = '{param_dict['auth_cd']}'"
+    query += cond
+
+    dbConn = db_connector.DbConn()
+
+    auth_data = dbConn.select(query=query)
+
+    auth_lst = []
+
+    for data in auth_data:
+        auth_dict = dict(zip(['auth_cd', 'act_yn', 'auth_no'],data))
+        auth_lst.append(auth_dict)
+
+        for dicta in auth_lst:
+            if dicta['auth_cd'] == param_dict['auth_cd']:
+                dicta['act_yn'] = 'Y'
+                dicta['auth_result'] = 'ok'
+            else:
+                dicta['auth_yn'] = 'N'
+                dicta['auth_result'] = 'fail'
+
+    if len(auth_lst) > 0:
+        auth_result = 'ok'
+    else:
+        auth_result = 'fail'
+    del(dbConn)
+    return jsonify({'result': auth_lst, 'authorization_result' : auth_result})
+
+@app.route('/log', methods=['GET', 'POST'])
+def log():
+    param_dict = request.args.to_dict()
+    print(param_dict['test'])
+    return jsonify({'result': 'ok'})
+
+@app.route('/test', methods=['POST'])
+def test():
+    param_dict = request.form.get('val1')
+    print(param_dict)
+
+    # 기본 모델 조회 쿼리(조건 언제나 TRUE)
+    query = "SELECT * FROM model WHERE 1=1 "
+
+    # DB 객체 생성
+    dbConn = db_connector.DbConn()
+    # 쿼리 실행
+    result = dbConn.selectAsDict(query)
+
+    print(result)
+    del(dbConn)
+    return jsonify({'result': 'ok'})
+
+
+if __name__ == "__main__":
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+    ssl_context.load_cert_chain(certfile='server.crt', keyfile='server.key', password='1234')
+    app.run(host='0.0.0.0', port=5443, ssl_context=ssl_context, debug=False)
