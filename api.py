@@ -66,8 +66,12 @@ def client_init():
 
     res=request.get_json()
     auth_key    = res['key']
-    query = f"SELECT str_no FROM auth WHERE auth_cd = {auth_key}"
+    
+    query = f"SELECT str_no FROM auth WHERE auth_cd = '{auth_key}'"
     str_no      = dbConn.select(query=query)[0][0]
+    query = f"SELECT model_no FROM model WHERE str_no = {str_no}"
+    model_no=dbConn.select(query=query)[0][0]
+    
     isauth=authorize(auth_key)
     global model_load_dict
     if isauth==False:
@@ -78,10 +82,9 @@ def client_init():
         if auth_key in list(model_load_dict.keys()):
             print(f"MODEL NUMBER {model_no} has been already Loaded.")
         else:
-            query = f"SELECT model_no FROM model WHERE str_no = {str_no}"
-            model_no=dbConn.select(query=query)[0][0]
+
             model_init=inf.model(model_no,1)
-            model_load_dict[auth_key] = model_init# 나중엔 임시키 / gpu도 자동설정 str_no가 아니라 model_no으로 해야됨.
+            model_load_dict[auth_key] = model_init # 나중엔 임시키 / gpu도 자동설정 str_no가 아니라 model_no으로 해야됨.
             print(f"MODEL NUMBER {model_no} is Loaded.")
             del(dbConn)
     return jsonify({'result' : 'ok', 'str_label_list':str_label_list})
