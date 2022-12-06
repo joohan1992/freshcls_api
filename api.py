@@ -62,9 +62,12 @@ def client_init():
     output  :   result : 'ok' / 'fail'
                 str_label_list : list
     '''
+    dbConn = db_connector.DbConn()
+
     res=request.get_json()
     auth_key    = res['key']
-    str_no      = res['str_no']
+    query = f"SELECT str_no FROM auth WHERE auth_cd = {auth_key}"
+    str_no      = dbConn.select(query=query)[0][0]
     isauth=authorize(auth_key)
     global model_load_dict
     if isauth==False:
@@ -75,7 +78,6 @@ def client_init():
         if auth_key in list(model_load_dict.keys()):
             print(f"MODEL NUMBER {model_no} has been already Loaded.")
         else:
-            dbConn = db_connector.DbConn()
             query = f"SELECT model_no FROM model WHERE str_no = {str_no}"
             model_no=dbConn.select(query=query)[0][0]
             model_init=inf.model(model_no,1)

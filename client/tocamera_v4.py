@@ -5,19 +5,18 @@
 import cv2
 import threading
 import time
-import numpy as np
 import requests
-from datetime import datetime
 import base64
 import sys
 encoding = sys.getdefaultencoding()
 
 URL = 'https://10.28.78.30:8091/'
-#URL = 'https://10.28.100.11:5444/'
+URL = 'https://10.28.100.11:5444/'
 INFER_URL = URL + 'run'
 FEEDBACK_URL = URL + 'infer_feedback'
 INIT_URL = URL + 'client_init'
-CRUDENTIAL_KEY="7{@:M8IR;DW\\/X71uhHOd[nxa@uB%+m(/<Owq5LZ.kO%K583{t-fDb'GkE$YscX?N`X}M=WnMC<Ed}a4.$.lvDPL=q;i237fvcDjPPXmY`r.FU`@D*nQ]mBTNb#t7_Qw*Tr?f6]aTWm},Z(8L&^xI$^5Ccru'a.}'/uaN+{d\\Ox#FWv(ZT,>8vVC}kc2q2&'.qddiHnN}^*L]A*ZMT,{soMw@BrppFG[OIrv_bD/b67H:H0-;dxDID/Y[Yhz{y~VUVG|(aZ]]xj[jB*q)ARPA>)S._*JH]iE!zlnFzBatlkAfvy"
+EXIT_URL = URL + 'exit'
+CRUDENTIAL_KEY="hanwhatechwin1206"
 
 print("Program Starting")
 ###
@@ -31,10 +30,9 @@ DEVICENUM=0
 CAM_NAME="Camera"
 BOARD_NAME="Board"
 RTSP=""
-STR_NO=1
+STR_NO=0
 res = requests.post(INIT_URL,
-        json={  "key": CRUDENTIAL_KEY,
-                "str_no": STR_NO
+        json={  "key": CRUDENTIAL_KEY
                 }, verify=False) ## 나중에 ID 랑 PW 도 보내야됨(NONE으로)
 result=res.json()['str_label_list']
 item_Eng={}
@@ -298,6 +296,9 @@ while(True):
 phase=-1
 print("exit")
 capture.release()
+requests.post(EXIT_URL,
+                    json={  "key":CRUDENTIAL_KEY,
+                            }, verify=False)
 cv2.destroyAllWindows()
 
 
