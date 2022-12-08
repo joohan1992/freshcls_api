@@ -79,12 +79,11 @@ def client_init():
     # DB에서 api 형태로 query 정보를 받아오는 코드
     else:
         str_label_list = initialize(str_no)
-        if auth_key in list(model_load_dict.keys()):
+        if model_no in list(model_load_dict.keys()):
             print(f"MODEL NUMBER {model_no} has been already Loaded.")
         else:
-
             model_init=inf.model(model_no,1)
-            model_load_dict[auth_key] = model_init # 나중엔 임시키 / gpu도 자동설정 str_no가 아니라 model_no으로 해야됨.
+            model_load_dict[model_no] = model_init # 나중엔 임시키 / gpu도 자동설정 str_no가 아니라 model_no으로 해야됨.
             print(f"MODEL NUMBER {model_no} is Loaded.")
             del(dbConn)
     return jsonify({'result' : 'ok', 'str_label_list':str_label_list})
@@ -174,11 +173,11 @@ def login():
         dict_result['label_init']=initialize(dict_result['str_no'])
 
         # 모델 불러오기
-        if userID in list(model_load_dict.keys()):
+        if model_no in list(model_load_dict.keys()):
             print(f"MODEL NUMBER {model_no} has been already Loaded.")
         else:
             model_init=inf.model(model_no,0)
-            model_load_dict[userID] = model_init# 나중엔 임시키 / gpu도 자동설정 str_no가 아니라 model_no으로 해야됨.
+            model_load_dict[model_no] = model_init# 나중엔 임시키 / gpu도 자동설정 str_no가 아니라 model_no으로 해야됨.
             print(f"MODEL NUMBER {model_no} is Loaded.")
     print(dict_result)
 
@@ -198,9 +197,20 @@ def run():
     if isauth == False: ## 인증키 없으면
         return jsonify({'result': 'fail'})
     if res['ID']=='None':
-        model=model_load_dict[res['key']]
+        dbConn = db_connector.DbConn()
+        query = f"SELECT * FROM auth WHERE auth_cd='{res['key']}' "
+        result = dbConn.selectAsDict(query)[0]
+        query = f"SELECT * FROM model WHERE model_no={result['str_no']} "
+        model_no= dbConn.selectAsDict(query)[0]['model_no']
+        model=model_load_dict[model_no]
     else :
-        model=model_load_dict[res['ID']]
+        dbConn = db_connector.DbConn()
+        query = f"SELECT * FROM login WHERE id='{res['ID']}' "
+        result = dbConn.selectAsDict(query)[0]
+        query = f"SELECT * FROM model WHERE model_no={result['str_no']} "
+        model_no= dbConn.selectAsDict(query)[0]['model_no']
+        model=model_load_dict[model_no]
+    
     model.info()
     model.setImageInfo(res)
     model.saveImg()
@@ -208,7 +218,7 @@ def run():
     cls_list=model.clsLogic()
     timecheck=inf.current_milli_time()-timecheck
     model.log(timecheck)
-
+    del(dbConn)
     return jsonify({'result': 'ok', 'cls_list': cls_list, 'infer_no' :model.infer_no }) #feedback을 위해서 infer_no도 반환
 
 @app.route('/infer_feedback', methods=['POST'])
@@ -299,6 +309,19 @@ def auth():
 def log():
     param_dict = request.args.to_dict()
     print(param_dict['test'])
+    return jsonify({'result': 'ok'})
+
+@app.route('/exit', methods=['POST'])
+def exit():
+    res=request.get_json()
+    auth_key    = res['key']
+    dbConn = db_connector.DbConn()
+    query = f"SELECT * FROM auth WHERE auth_cd='{auth_key}' "
+    result = dbConn.selectAsDict(query)[0]
+    query = f"SELECT * FROM model WHERE model_no={result['str_no']} "
+    model_no= dbConn.selectAsDict(query)[0]['model_no']
+    del(model_load_dict[model_no])
+    del(dbConn)
     return jsonify({'result': 'ok'})
 
 @app.route('/test', methods=['POST'])

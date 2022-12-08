@@ -66,9 +66,18 @@ class model():
         self.userID      = res['ID']
         self.userPW      = res['PW']
         self.auth_key    = res['key']
-        self.str_no      = res['str_no']
         self.send_device = res['send_device']
         self.auth        = res['auth'] # code or id
+
+        dbConn = db_connector.DbConn()
+        if self.userID=="None":
+            query = f"SELECT * FROM auth WHERE auth_cd='{self.auth_key}' "
+            self.str_no = dbConn.selectAsDict(query)[0]['str_no']
+        else:
+            query = f"SELECT * FROM login WHERE id='{self.userID}' "
+            self.str_no = dbConn.selectAsDict(query)[0]['str_no']
+        del(dbConn)
+
     def saveImg(self):  
         # set filename
         filename=now()+'.jpg'
