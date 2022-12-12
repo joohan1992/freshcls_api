@@ -1,14 +1,7 @@
 
 
 
+import cv2
 
-a=3
-
-def prt():
-    global a
-    print(a)
-    a=a+2
-    
-
-prt()
-print(a)
+req_img=cv2.imread("./26.jpg",1)
+print(req_img.shape[1])

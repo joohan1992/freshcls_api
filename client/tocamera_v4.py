@@ -7,14 +7,14 @@ import threading
 import requests
 import base64
 import sys
+import time
 encoding = sys.getdefaultencoding()
 
-URL = 'https://10.28.78.30:8091/'
-URL = 'https://10.28.100.11:5443/'
-INFER_URL = URL + 'run'
-FEEDBACK_URL = URL + 'infer_feedback'
-INIT_URL = URL + 'client_init'
-EXIT_URL = URL + 'exit'
+URL = 'https://211.58.242.46:8091'
+INFER_URL = URL + '/run'
+FEEDBACK_URL = URL + '/infer_feedback'
+INIT_URL = URL + '/client_init'
+EXIT_URL = URL + '/exit'
 CRUDENTIAL_KEY="hanwhatechwin1206"
 
 print("Program Starting")
@@ -29,7 +29,7 @@ DEVICENUM=0
 CAM_NAME="Camera"
 BOARD_NAME="Board"
 RTSP=""
-
+DELAYSECOND = 0.4
 searching=cv2.imread(LOADIMGSRC,1)
 btclk=False
 phase=0
@@ -49,15 +49,12 @@ try:
             RTSP = str(token[1])
         elif title == 'URL':
             URL = str(token[1])
-            INFER_URL = URL + 'run'
-            FEEDBACK_URL = URL + 'infer_feedback'
-            INIT_URL = URL + 'client_init'
-        elif title == 'INFER_URL':
-            INFER_URL = str(token[1])
-        elif title == 'FEEDBACK_URL':
-            FEEDBACK_URL = str(token[1])
-        elif title == 'INIT_URL':
-            INIT_URL = str(token[1])
+            INFER_URL = URL + '/run'
+            FEEDBACK_URL = URL + '/infer_feedback'
+            INIT_URL = URL + '/client_init'
+            EXIT_URL = URL + '/exit'
+        elif title == 'DELAY':
+            DELAYSECOND = float(token[1])
         elif title == 'CAM_MOVE_X':
             CAM_MOVE_X = int(token[1])
         elif title == 'CAM_MOVE_Y':
@@ -72,8 +69,6 @@ try:
             LOADIMGSRC = str(token[1])    
         elif title == 'KEY':
             CRUDENTIAL_KEY = str(token[1])
-        elif title == 'STORE NUMBER':
-            STR_NO = int(token[1])
         elif title == 'Undefined Message':
             UNDEFMSG = str(token[1])
         elif title == 'CAMSIZE':
@@ -141,12 +136,10 @@ def switching(input):
     return input
 
 print("Video Initializing")
-
 if len(RTSP)>4:
     try:
         capture = cv2.VideoCapture(RTSP)
         camerastate=-1
-        IMGSIZE = (490, 260)
     except:
         print("Can't Find WebCamera. Use Local Camera...")
         capture = cv2.VideoCapture(DEVICENUM)
@@ -156,28 +149,19 @@ else:
     camerastate=DEVICENUM
 
 ret, frame_origin = capture.read()
-width = int(capture.get(3))
-height = int(capture.get(4))
-if camerastate != -1:
-    IMGSIZE = (width,height)
-
 frame = None
 
 ### camera threading
-
-cv2.namedWindow(CAM_NAME, cv2.WINDOW_NORMAL)
-cv2.setWindowProperty(CAM_NAME, cv2.WND_PROP_FULLSCREEN, 1)
-cv2.setWindowProperty(CAM_NAME, cv2.WND_PROP_TOPMOST, 1)
-cv2.resizeWindow(CAM_NAME, CAMSIZE[0],CAMSIZE[1])
-cv2.moveWindow(CAM_NAME, CAM_MOVE_X+CAMSIZE[0],CAM_MOVE_Y)
-
 ### threading
 def camera():
     global phase
     global cls_list
     global btclk
-    isCapt=False
+    btclk=True
+    isCapt=True
     isWrite=False
+    time.sleep(2)
+    print("API INIT")
     cv2.namedWindow(BOARD_NAME, cv2.WINDOW_NORMAL)
     cv2.setWindowProperty(BOARD_NAME, cv2.WND_PROP_FULLSCREEN, 1)
     cv2.setWindowProperty(BOARD_NAME, cv2.WND_PROP_TOPMOST, 1)
@@ -185,16 +169,17 @@ def camera():
     cv2.moveWindow(BOARD_NAME, CAM_MOVE_X,CAM_MOVE_Y)
     cv2.setMouseCallback(BOARD_NAME,btctrl)
     while(True):
+        time.sleep(DELAYSECOND)
         if ret != True:  # read에 실패하면 loop탈출
             break
         if (isCapt==True and isWrite==False):
+            print("INFER RECEPTION")
             Result1_IMG=frame.copy()
             Result2_IMG=frame.copy()
             if len(cls_list)==1:
                 phase=1
                 label_to_board(item_num=1,item=Result1_IMG,label1=cv2.imread("./fruitlabels/"+item_Eng[cls_list[0]]+".png",1))
                 log(message=item_Kor[cls_list[0]],filepath=LOGSRC)
-
             elif len(cls_list)==2:## 두개있을때
                 phase=2
                 label_to_board(item_num=2,item=Result1_IMG,label1=cv2.imread("./fruitlabels/"+item_Eng[cls_list[0]]+".png",1), label2=cv2.imread("./fruitlabels/"+item_Eng[cls_list[1]]+".png",1))
@@ -211,7 +196,6 @@ def camera():
                             }, verify=False)
             print(res.json()['result'])
             phase=3
-
         if phase==22:
             label_to_board(item_num=1,item=Result2_IMG,label1=cv2.imread("./fruitlabels/"+item_Eng[cls_list[1]]+".png",1))
             cv2.imshow(BOARD_NAME,Result2_IMG)
@@ -233,25 +217,23 @@ def camera():
             cls_list=[]
             isCapt=True
             isWrite=False
-            if camerastate==-1:
-                req_img=frame_origin.copy()
-                y=150
-                h=260
-                x=150
-                w=490
-                req_img=req_img[y: y + h, x: x + w]
-
             try:
                 # 전송할 이미지 현재 frame에서 copy
                 req_img=frame_origin.copy()
+                if camerastate==-1:
+                    y=150
+                    h=260
+                    x=150
+                    w=490
+                    req_img=req_img[y: y + h, x: x + w]
                 # img to str
                 encoded_byte = base64.b64encode(req_img)   
                 imgstr=encoded_byte.decode(encoding)
                 # request
                 res = requests.post(INFER_URL,
                                     json={  "image" : imgstr,
-                                            "x_size":IMGSIZE[0],
-                                            "y_size":IMGSIZE[1],
+                                            "x_size":req_img.shape[1],
+                                            "y_size":req_img.shape[0],
                                             "key":CRUDENTIAL_KEY,
                                             "auth":"code",
                                             "ID":"None",
@@ -277,6 +259,11 @@ t.start()
 ###
 ###
 ###
+cv2.namedWindow(CAM_NAME, cv2.WINDOW_NORMAL)
+cv2.setWindowProperty(CAM_NAME, cv2.WND_PROP_FULLSCREEN, 1)
+cv2.setWindowProperty(CAM_NAME, cv2.WND_PROP_TOPMOST, 1)
+cv2.resizeWindow(CAM_NAME, CAMSIZE[0],CAMSIZE[1])
+cv2.moveWindow(CAM_NAME, CAM_MOVE_X+CAMSIZE[0],CAM_MOVE_Y)
 
 while phase!=-1:
     ret, frame_origin = capture.read()

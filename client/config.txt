@@ -11,10 +11,7 @@
 #
 #DEVICENUM	
 #RTSP	
-#URL	
-#INFER_URL	
-#FEEDBACK_URL	
-#INIT_URL	
+URL	https://211.58.242.46:8091
 #CAM_NAME	
 #BOARD_NAME	
 #LOGSRC	
@@ -24,6 +21,7 @@
 #CAM_MOVE_X	950
 #CAM_MOVE_Y	
 #CAMSIZE	(480,360)
+#DELAY
 #
 #########################################################
 #########################################################
