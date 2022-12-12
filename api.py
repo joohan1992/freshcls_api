@@ -83,7 +83,7 @@ def client_init():
             print(f"MODEL NUMBER {model_no} has been already Loaded.")
         else:
             model_init=inf.model(model_no,1)
-            model_load_dict[model_no] = model_init # 나중엔 임시키 / gpu도 자동설정 str_no가 아니라 model_no으로 해야됨.
+            model_load_dict[model_no] = model_init # 나중엔 임시키 / gpu도 자동설정
             print(f"MODEL NUMBER {model_no} is Loaded.")
             del(dbConn)
     return jsonify({'result' : 'ok', 'str_label_list':str_label_list})
