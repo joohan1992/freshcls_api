@@ -82,8 +82,7 @@ def client_init():
         if model_no in list(model_load_dict.keys()):
             print(f"MODEL NUMBER {model_no} has been already Loaded.")
         else:
-            model_init=inf.model(model_no,1)
-            model_load_dict[model_no] = model_init # 나중엔 임시키 / gpu도 자동설정
+            model_load_dict[model_no] = inf.model(model_no,1) # 나중엔 임시키 / gpu도 자동설정
             print(f"MODEL NUMBER {model_no} is Loaded.")
             del(dbConn)
     return jsonify({'result' : 'ok', 'str_label_list':str_label_list})
@@ -98,7 +97,6 @@ def login():
     userID = str(res['id'])
     userPW = str(res['password'])
     params = [userID, userPW]
-    print(params)
     param_dict = dict(zip(['id', 'password'], params))
 
     # DB에서 api 형태로 query 정보를 받아오는 코드
@@ -111,7 +109,6 @@ def login():
     login_dict = None
     if len(login_data) > 0:
         login_dict = dict(zip(['id', 'password', 'login_no', 'act_yn', 'str_no'],login_data[0]))
-        print(login_dict)
         isIdExist = True
     else:
         isIdExist = False
@@ -176,10 +173,8 @@ def login():
         if model_no in list(model_load_dict.keys()):
             print(f"MODEL NUMBER {model_no} has been already Loaded.")
         else:
-            model_init=inf.model(model_no,0)
-            model_load_dict[model_no] = model_init# 나중엔 임시키 / gpu도 자동설정 str_no가 아니라 model_no으로 해야됨.
+            model_load_dict[model_no] = inf.model(model_no,0)# 나중엔 임시키 / gpu도 자동설정 str_no가 아니라 model_no으로 해야됨.
             print(f"MODEL NUMBER {model_no} is Loaded.")
-    print(dict_result)
 
     # 비교 후 작성된 dict 내용을 json 혹은 ajax 형태로 flutter에 전송하기 위한 코드
     # res = requests.post("https://192.168.0.108:2092/login", data = json.dumps(dict_result), verify = False)

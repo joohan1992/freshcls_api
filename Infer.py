@@ -195,7 +195,7 @@ class model():
         del(dbConn)
 
     def __del__(self):
-        pass
+        print(f"model {self.model_no} is free.")
 
 class machine():
     def __init__(self,info,gpu) -> None:
@@ -262,5 +262,6 @@ class machine():
         del(dbConn)
         return result
 
-
+    def __del__(self):
+        print(f"machine {self.ensemble_model_no} is free.")
         ####################### EOF #######################
