@@ -225,7 +225,7 @@ def camera():
                     h=260
                     x=150
                     w=490
-                    req_img=req_img[y: y + h, x: x + w]
+                    req_img=req_img[y: y + h, x: x + w].copy()
                 # img to str
                 encoded_byte = base64.b64encode(req_img)   
                 imgstr=encoded_byte.decode(encoding)
