@@ -15,7 +15,7 @@ INFER_URL = URL + '/run'
 FEEDBACK_URL = URL + '/infer_feedback'
 INIT_URL = URL + '/client_init'
 EXIT_URL = URL + '/exit'
-CRUDENTIAL_KEY="hanwhatechwin1206"
+CRUDENTIAL_KEY="pl3213"
 
 print("Program Starting")
 ###
