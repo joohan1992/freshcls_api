@@ -34,6 +34,10 @@ searching=cv2.imread(LOADIMGSRC,1)
 btclk=False
 phase=0
 camerastate=0
+yy=150
+hh=260
+xx=150
+ww=490
 
 try:
     f_config = open('./config.txt', 'r')
@@ -71,6 +75,14 @@ try:
             CRUDENTIAL_KEY = str(token[1])
         elif title == 'Undefined Message':
             UNDEFMSG = str(token[1])
+        elif title == 'RTSP_X':
+            xx = int(token[1])
+        elif title == 'RTSP_Y':
+            yy = int(token[1])
+        elif title == 'RTSP_W':
+            ww = int(token[1])
+        elif title == 'RTSP_H':
+            hh = int(token[1])
         elif title == 'CAMSIZE':
             CAMSIZE = ( int(str(token[1]).replace("(","").replace(")","").split(",")[0]),
                         int(str(token[1]).replace("(","").replace(")","").split(",")[1]))
@@ -221,11 +233,7 @@ def camera():
                 # 전송할 이미지 현재 frame에서 copy
                 req_img=frame_origin.copy()
                 if camerastate==-1:
-                    y=150
-                    h=260
-                    x=150
-                    w=490
-                    req_img=req_img[y: y + h, x: x + w].copy()
+                    req_img=req_img[yy: yy + hh, xx: xx + ww].copy()
                 # img to str
                 encoded_byte = base64.b64encode(req_img)   
                 imgstr=encoded_byte.decode(encoding)
