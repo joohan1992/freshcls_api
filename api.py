@@ -336,11 +336,9 @@ def test():
     del(dbConn)
     return jsonify({'result': 'ok'})
 
+
 @app.route('/getRegLabel', methods=['POST'])
 def getRegLabel():
-    param_dict = request.form.get('val1')
-    print(param_dict)
-
     # 기본 모델 조회 쿼리(조건 언제나 TRUE)
     query = "SELECT clm.com_lab_no, clm.com_lab_nm, clm.reg_dtm FROM com_lab_mst clm WHERE 1=1 and clm.use_yn = '1' "
 
@@ -349,7 +347,37 @@ def getRegLabel():
     # 쿼리 실행
     result = dbConn.selectAsDict(query)
 
-    print(result)
+    del(dbConn)
+    return jsonify({'result': 'ok', 'data': result})
+
+
+@app.route('/getReqComLabelReg', methods=['POST'])
+def getReqComLabelReg():
+    res=request.get_json()
+    co_no = res['co_no']
+
+    # 기본 모델 조회 쿼리(조건 언제나 TRUE)
+    query = f"SELECT " \
+            f"  clgr.com_lab_gen_req_no " \
+            f"  , clgr.req_dt " \
+            f"  , clgr.req_tm " \
+            f"  , clgr.proc_stat " \
+            f"  , cci.cm_itm_nm AS proc_stat_nm " \
+            f"  , clgr.req_lab_nm " \
+            f"  , clgr.req_msg " \
+            f"  , clgr.res_msg " \
+            f"FROM com_lab_gen_req clgr " \
+            f"INNER JOIN cm_cd_itm cci " \
+            f"  ON cci.cm_grp_cd = 'req_proc_stat' " \
+            f"  AND cci.cm_itm_cd = clgr.proc_stat " \
+            f"WHERE 1=1 and clgr.req_co_no = '{co_no}' and clgr.use_yn = '1' " \
+            f"ORDER BY clgr.com_lab_gen_req_no DESC "
+
+    # DB 객체 생성
+    dbConn = db_connector.DbConn()
+    # 쿼리 실행
+    result = dbConn.selectAsDict(query)
+
     del(dbConn)
     return jsonify({'result': 'ok', 'data': result})
 
